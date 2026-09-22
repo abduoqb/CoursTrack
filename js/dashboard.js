@@ -1,0 +1,163 @@
+import { Store } from './store.js';
+import { calcProgress, progressClass, escapeHtml } from './utils.js';
+
+// Couleurs pastel pour différencier les matières
+const SUBJECT_COLORS = [
+    '#2563EB', // blue
+    '#8B5CF6', // violet
+    '#EC4899', // pink
+    '#F59E0B', // amber
+    '#10B981', // emerald
+    '#06B6D4', // cyan
+    '#F97316', // orange
+    '#6366F1', // indigo
+];
+
+export function renderDashboard() {
+    const app = document.getElementById('app');
+    const subjects = Store.getSubjects();
+
+    // Stats globales
+    let globalTotal = 0, globalDone = 0;
+    for (const s of subjects) {
+        for (const cat of s.categories) {
+            globalTotal += cat.items.length;
+            globalDone += cat.items.filter(i => i.done).length;
+        }
+    }
+    const globalProgress = globalTotal === 0 ? 0 : Math.round((globalDone / globalTotal) * 100);
+    const globalPClass = progressClass(globalProgress);
+
+    // Matières en retard (< 50% avec des éléments)
+    const behindSubjects = subjects.filter(s => {
+        const hasItems = s.categories.some(c => c.items.length > 0);
+        return hasItems && calcProgress(s) < 50;
+    });
+
+    app.innerHTML = `
+        <!-- Résumé global -->
+        <div class="global-summary">
+            <div class="global-summary-header">
+                <h2>Progression globale</h2>
+                <span class="global-percentage">${globalProgress}%</span>
+            </div>
+            <div class="progress-bar progress-bar-lg">
+                <div class="progress-fill ${globalPClass}" style="width: ${globalProgress}%"></div>
+            </div>
+            <div class="global-stats">
+                <span>${globalDone}/${globalTotal} cours terminés</span>
+                <span>${subjects.length} matière${subjects.length !== 1 ? 's' : ''}</span>
+            </div>
+        </div>
+
+        ${behindSubjects.length > 0 ? `
+        <div class="behind-alert">
+            <span class="behind-icon">⚡</span>
+            <span>${behindSubjects.length} matière${behindSubjects.length > 1 ? 's' : ''} en retard :
+                ${behindSubjects.map(s => `<strong>${escapeHtml(s.name)}</strong>`).join(', ')}
+            </span>
+        </div>
+        ` : ''}
+
+        <div class="dashboard-header">
+            <h2>Mes matières</h2>
+        </div>
+        <div class="subjects-grid">
+            ${subjects.map((s, i) => renderCard(s, i)).join('')}
+            <div class="add-card" id="add-subject-card">
+                <span>+ Ajouter une matière</span>
+            </div>
+        </div>
+    `;
+
+    // Events
+    app.querySelectorAll('.subject-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.delete-btn')) return;
+            window.location.hash = `#/subject/${card.dataset.id}`;
+        });
+    });
+
+    app.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm(`Supprimer "${btn.dataset.name}" et tout son contenu ?`)) {
+                Store.deleteSubject(btn.dataset.id);
+                renderDashboard();
+            }
+        });
+    });
+
+    document.getElementById('add-subject-card').addEventListener('click', () => {
+        showAddSubjectModal();
+    });
+}
+
+function renderCard(subject, index) {
+    const progress = calcProgress(subject);
+    const pClass = progressClass(progress);
+    const color = SUBJECT_COLORS[index % SUBJECT_COLORS.length];
+
+    let totalItems = 0, doneItems = 0;
+    for (const cat of subject.categories) {
+        totalItems += cat.items.length;
+        doneItems += cat.items.filter(i => i.done).length;
+    }
+    const remaining = totalItems - doneItems;
+
+    return `
+        <div class="subject-card" data-id="${subject.id}" style="border-left-color: ${color}">
+            <button class="btn-icon danger delete-btn" data-id="${subject.id}" data-name="${escapeHtml(subject.name)}" title="Supprimer">×</button>
+            <span class="card-name">${escapeHtml(subject.name)}</span>
+            <div class="card-stats">
+                ${doneItems > 0 ? `<span class="stat-badge done">✓ ${doneItems} terminé${doneItems > 1 ? 's' : ''}</span>` : ''}
+                ${remaining > 0 ? `<span class="stat-badge remaining">${remaining} restant${remaining > 1 ? 's' : ''}</span>` : ''}
+            </div>
+            <div class="card-footer">
+                <div class="card-progress-row">
+                    <div class="progress-bar">
+                        <div class="progress-fill ${pClass}" style="width: ${progress}%"></div>
+                    </div>
+                    <span class="progress-pct">${progress}%</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function showAddSubjectModal() {
+    const overlay = document.getElementById('modal-overlay');
+    document.getElementById('modal-title').textContent = 'Nouvelle matière';
+    document.getElementById('modal-body').innerHTML = `
+        <label for="subject-name">Nom de la matière</label>
+        <input type="text" id="subject-name" placeholder="ex : Mathématiques" autofocus>
+    `;
+
+    overlay.classList.remove('hidden');
+    setTimeout(() => document.getElementById('subject-name').focus(), 100);
+
+    const cleanup = () => {
+        overlay.classList.add('hidden');
+        ['modal-confirm', 'modal-cancel', 'modal-close'].forEach(id => {
+            const el = document.getElementById(id);
+            el.replaceWith(el.cloneNode(true));
+        });
+    };
+
+    const doConfirm = () => {
+        const name = document.getElementById('subject-name').value.trim();
+        if (name) {
+            Store.addSubject(name);
+            cleanup();
+            renderDashboard();
+        }
+    };
+
+    document.getElementById('modal-confirm').addEventListener('click', doConfirm);
+    document.getElementById('modal-cancel').addEventListener('click', cleanup);
+    document.getElementById('modal-close').addEventListener('click', cleanup);
+    document.getElementById('subject-name').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') doConfirm();
+        if (e.key === 'Escape') cleanup();
+    });
+}
