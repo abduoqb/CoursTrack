@@ -210,7 +210,38 @@ export const Store = {
     getFile,
     deleteFile,
 
-    // Export / Import
+    // Bulk file helpers (for ZIP export/import)
+    async getAllFiles() {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(DB_STORE, 'readonly');
+            const store = tx.objectStore(DB_STORE);
+            const results = {};
+            const req = store.openCursor();
+            req.onsuccess = () => {
+                const cursor = req.result;
+                if (cursor) {
+                    results[cursor.key] = cursor.value;
+                    cursor.continue();
+                } else {
+                    resolve(results);
+                }
+            };
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async clearAllFiles() {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(DB_STORE, 'readwrite');
+            tx.objectStore(DB_STORE).clear();
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+
+    // Export / Import (metadata only — ZIP logic lives in app.js)
     exportData() {
         return JSON.stringify(load(), null, 2);
     },

@@ -38,7 +38,9 @@
 }
 
 /* ===== Reset ===== */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -58,7 +60,7 @@ body {
     background: var(--card);
     border-bottom: 1px solid var(--border);
     padding: 0 2rem;
-    height: 60px;
+    height: 80px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -74,7 +76,7 @@ body {
 }
 
 .header-logo {
-    height: 34px;
+    height: 150px;
     width: auto;
 }
 
@@ -353,10 +355,21 @@ body {
     background: var(--blue);
 }
 
-.progress-fill.low { background: var(--blue-light); }
-.progress-fill.mid { background: var(--blue); }
-.progress-fill.high { background: var(--green); }
-.progress-fill.complete { background: var(--green); }
+.progress-fill.low {
+    background: var(--blue-light);
+}
+
+.progress-fill.mid {
+    background: var(--blue);
+}
+
+.progress-fill.high {
+    background: var(--green);
+}
+
+.progress-fill.complete {
+    background: var(--green);
+}
 
 /* ===== Add Card ===== */
 .add-card {
@@ -698,13 +711,25 @@ body {
 }
 
 @keyframes toastIn {
-    from { transform: translateY(0.5rem); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(0.5rem);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 @keyframes toastOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
 }
 
 /* ===== Responsive ===== */
