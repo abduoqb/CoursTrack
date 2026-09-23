@@ -111,6 +111,15 @@ export const Store = {
         }
     },
 
+    setExamDate(id, dateStr) {
+        const data = load();
+        const subject = data.subjects.find(s => s.id === id);
+        if (subject) {
+            subject.examDate = dateStr || null;
+            save(data);
+        }
+    },
+
     addCategory(subjectId, name) {
         const data = load();
         const subject = data.subjects.find(s => s.id === subjectId);

@@ -1,5 +1,5 @@
 import { Store } from './store.js';
-import { calcProgress, progressClass, escapeHtml } from './utils.js';
+import { calcProgress, progressClass, escapeHtml, examInfo } from './utils.js';
 
 // Couleurs pastel pour différencier les matières
 const SUBJECT_COLORS = [
@@ -34,6 +34,13 @@ export function renderDashboard() {
         return hasItems && calcProgress(s) < 50;
     });
 
+    // Examens à venir (triés par date, exclut les passés)
+    const upcomingExams = subjects
+        .filter(s => s.examDate)
+        .map(s => ({ subject: s, info: examInfo(s.examDate) }))
+        .filter(e => e.info && e.info.days >= 0)
+        .sort((a, b) => a.info.days - b.info.days);
+
     app.innerHTML = `
         <!-- Résumé global -->
         <div class="global-summary">
@@ -49,6 +56,28 @@ export function renderDashboard() {
                 <span>${subjects.length} matière${subjects.length !== 1 ? 's' : ''}</span>
             </div>
         </div>
+
+        ${upcomingExams.length > 0 ? `
+        <div class="exams-upcoming">
+            <h3 class="exams-upcoming-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Examens à venir
+            </h3>
+            <div class="exams-list">
+                ${upcomingExams.map(e => {
+                    const dateFormatted = new Date(e.subject.examDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' });
+                    return `
+                    <div class="exam-row exam-${e.info.urgency}">
+                        <span class="exam-icon">${e.info.icon}</span>
+                        <span class="exam-name">${escapeHtml(e.subject.name)}</span>
+                        <span class="exam-date">${dateFormatted}</span>
+                        <span class="exam-countdown">${e.info.label}</span>
+                    </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+        ` : ''}
 
         ${behindSubjects.length > 0 ? `
         <div class="behind-alert">
@@ -105,10 +134,22 @@ function renderCard(subject, index) {
     }
     const remaining = totalItems - doneItems;
 
+    // Exam badge
+    const eInfo = examInfo(subject.examDate);
+    let examBadgeHtml = '';
+    if (eInfo) {
+        if (eInfo.urgency === 'past') {
+            examBadgeHtml = `<span class="exam-badge exam-badge-past">Examen passé</span>`;
+        } else {
+            examBadgeHtml = `<span class="exam-badge exam-badge-${eInfo.urgency}">${eInfo.icon} ${eInfo.label}</span>`;
+        }
+    }
+
     return `
         <div class="subject-card" data-id="${subject.id}" style="border-left-color: ${color}">
             <button class="btn-icon danger delete-btn" data-id="${subject.id}" data-name="${escapeHtml(subject.name)}" title="Supprimer">×</button>
             <span class="card-name">${escapeHtml(subject.name)}</span>
+            ${examBadgeHtml}
             <div class="card-stats">
                 ${doneItems > 0 ? `<span class="stat-badge done">✓ ${doneItems} terminé${doneItems > 1 ? 's' : ''}</span>` : ''}
                 ${remaining > 0 ? `<span class="stat-badge remaining">${remaining} restant${remaining > 1 ? 's' : ''}</span>` : ''}
