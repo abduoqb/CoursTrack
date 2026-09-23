@@ -48,7 +48,7 @@ async function exportZip() {
                     zip.file(filePath, fileData.blob);
 
                     // Keep track for data.json
-                    fileMap[item.fileId] = { path: filePath, name: fileName };
+                    fileMap[item.fileId] = { path: filePath, name: fileName, type: fileData.type || '' };
                 }
             }
         }
@@ -62,6 +62,7 @@ async function exportZip() {
                 if (item.fileId && fileMap[item.fileId]) {
                     item.fileName = fileMap[item.fileId].name;
                     item.filePath = fileMap[item.fileId].path;
+                    item.fileType = fileMap[item.fileId].type;
                 }
             }
         }
@@ -111,7 +112,8 @@ async function importZip(file) {
                         if (zipFile) {
                             const blob = await zipFile.async('blob');
                             const fileName = item.fileName || item.filePath.split('/').pop();
-                            const fileObj = new File([blob], fileName);
+                            const mimeType = item.fileType || '';
+                            const fileObj = new File([blob], fileName, { type: mimeType });
                             await Store.saveFile(item.fileId, fileObj);
                         } else {
                             // File referenced but not found in ZIP → reset
@@ -121,6 +123,7 @@ async function importZip(file) {
                     // Clean up export-only fields
                     delete item.fileName;
                     delete item.filePath;
+                    delete item.fileType;
                 }
             }
         }

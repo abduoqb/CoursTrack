@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>CoursTrack — Tests Export/Import ZIP</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body { font-family: 'Inter', monospace; background: #0f172a; color: #e2e8f0; padding: 2rem; }
+        h1 { color: #60a5fa; margin-bottom: 0.25rem; }
+        .subtitle { color: #64748b; font-size: 0.85rem; margin-bottom: 1.5rem; }
+        .pass { color: #22c55e; }
+        .fail { color: #ef4444; }
+        .info { color: #f59e0b; }
+        #log { white-space: pre-wrap; line-height: 1.8; font-size: 0.9rem; }
+        .summary { margin-top: 2rem; padding: 1rem; border-radius: 8px; font-size: 1.1rem; font-weight: 600; }
+        .summary.ok { background: #14532d; color: #22c55e; }
+        .summary.ko { background: #7f1d1d; color: #ef4444; }
+    </style>
+</head>
+<body>
+    <h1>🧪 CoursTrack — Test Suite</h1>
+    <p class="subtitle">⚠️ Tests isolés — vos données réelles ne sont PAS touchées</p>
+    <div id="log"></div>
+
+    <script type="module">
+        import { uuid } from './js/utils.js';
+
+        // =========================================================
+        // STORE ISOLÉ — clés différentes de la vraie app
+        // STORAGE_KEY  : 'suivit_cours_data'   → '_test_cours_data'
+        // DB_NAME      : 'suivit_cours_files'  → '_test_cours_files'
+        // =========================================================
+
+        const TEST_STORAGE_KEY = '_test_cours_data';
+        const TEST_DB_NAME     = '_test_cours_files';
+        const DB_STORE         = 'files';
+        const DB_VERSION       = 1;
+
+        function tLoad() {
+            try {
+                const d = localStorage.getItem(TEST_STORAGE_KEY);
+                return d ? JSON.parse(d) : { subjects: [] };
+            } catch { return { subjects: [] }; }
+        }
+        function tSave(data) {
+            localStorage.setItem(TEST_STORAGE_KEY, JSON.stringify(data));
+        }
+
+        function openTestDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(TEST_DB_NAME, DB_VERSION);
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(DB_STORE))
+                        db.createObjectStore(DB_STORE);
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror  = () => reject(req.error);
+            });
+        }
+
+        async function tSaveFile(fileId, file) {
+            const db = await openTestDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(DB_STORE, 'readwrite');
+                tx.objectStore(DB_STORE).put({ blob: file, name: file.name, type: file.type }, fileId);
+                tx.oncomplete = () => resolve();
+                tx.onerror    = () => reject(tx.error);
+            });
+        }
+
+        async function tGetFile(fileId) {
+            const db = await openTestDB();
+            return new Promise((resolve, reject) => {
+                const tx  = db.transaction(DB_STORE, 'readonly');
+                const req = tx.objectStore(DB_STORE).get(fileId);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror   = () => reject(req.error);
+            });
+        }
+
+        async function tDeleteFile(fileId) {
+            const db = await openTestDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(DB_STORE, 'readwrite');
+                tx.objectStore(DB_STORE).delete(fileId);
+                tx.oncomplete = () => resolve();
+                tx.onerror    = () => reject(tx.error);
+            });
+        }
+
+        async function tGetAllFiles() {
+            const db = await openTestDB();
+            return new Promise((resolve, reject) => {
+                const tx      = db.transaction(DB_STORE, 'readonly');
+                const results = {};
+                const req     = tx.objectStore(DB_STORE).openCursor();
+                req.onsuccess = () => {
+                    const cursor = req.result;
+                    if (cursor) { results[cursor.key] = cursor.value; cursor.continue(); }
+                    else resolve(results);
+                };
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function tClearAllFiles() {
+            const db = await openTestDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(DB_STORE, 'readwrite');
+                tx.objectStore(DB_STORE).clear();
+                tx.oncomplete = () => resolve();
+                tx.onerror    = () => reject(tx.error);
+            });
+        }
+
+        // ===== Test Store API (mirrors real Store but uses isolated DB) =====
+        const T = {
+            getSubjects: () => tLoad().subjects,
+            getSubject:  id => tLoad().subjects.find(s => s.id === id) || null,
+            addSubject(name) {
+                const data = tLoad();
+                const subj = { id: uuid(), name, categories: [] };
+                data.subjects.push(subj);
+                tSave(data);
+                return subj;
+            },
+            addCategory(subjectId, name) {
+                const data = tLoad();
+                const subj = data.subjects.find(s => s.id === subjectId);
+                if (!subj) return null;
+                if (subj.categories.some(c => c.name.toLowerCase() === name.toLowerCase())) return null;
+                const cat = { name, items: [] };
+                subj.categories.push(cat);
+                tSave(data);
+                return cat;
+            },
+            addItem(subjectId, catName, title) {
+                const data = tLoad();
+                const subj = data.subjects.find(s => s.id === subjectId);
+                const cat  = subj?.categories.find(c => c.name === catName);
+                if (!cat) return null;
+                const item = { id: uuid(), title, done: false, fileId: null };
+                cat.items.push(item);
+                tSave(data);
+                return item;
+            },
+            deleteItem(subjectId, catName, itemId) {
+                const data = tLoad();
+                const subj = data.subjects.find(s => s.id === subjectId);
+                const cat  = subj?.categories.find(c => c.name === catName);
+                if (!cat) return;
+                const item = cat.items.find(i => i.id === itemId);
+                if (item?.fileId) tDeleteFile(item.fileId).catch(() => {});
+                cat.items = cat.items.filter(i => i.id !== itemId);
+                tSave(data);
+            },
+            setItemFile(subjectId, catName, itemId, fileId) {
+                const data = tLoad();
+                const subj = data.subjects.find(s => s.id === subjectId);
+                const cat  = subj?.categories.find(c => c.name === catName);
+                const item = cat?.items.find(i => i.id === itemId);
+                if (!item) return;
+                if (item.fileId) tDeleteFile(item.fileId).catch(() => {});
+                item.fileId = fileId;
+                tSave(data);
+            },
+            importData(jsonStr) {
+                try {
+                    const data = JSON.parse(jsonStr);
+                    if (data.subjects && Array.isArray(data.subjects)) { tSave(data); return true; }
+                    return false;
+                } catch { return false; }
+            },
+            saveFile:     tSaveFile,
+            getFile:      tGetFile,
+            deleteFile:   tDeleteFile,
+            getAllFiles:   tGetAllFiles,
+            clearAllFiles:tClearAllFiles,
+        };
+
+        // ===== Sanitize =====
+        function sanitizeName(name) {
+            return name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'sans-nom';
+        }
+
+        // ===== ZIP helpers (mirror of app.js) =====
+        async function exportZip(store) {
+            const zip      = new JSZip();
+            const subjects = store.getSubjects();
+            const allFiles = await store.getAllFiles();
+            const fileMap  = {};
+
+            for (const subject of subjects) {
+                const sf = sanitizeName(subject.name);
+                for (const cat of subject.categories) {
+                    const cf = sanitizeName(cat.name);
+                    for (const item of cat.items) {
+                        if (item.fileId && allFiles[item.fileId]) {
+                            const fd       = allFiles[item.fileId];
+                            const fileName = fd.name || `${item.id}.bin`;
+                            const filePath = `${sf}/${cf}/${fileName}`;
+                            zip.file(filePath, fd.blob);
+                            fileMap[item.fileId] = { path: filePath, name: fileName, type: fd.type || '' };
+                        }
+                    }
+                }
+            }
+
+            const exportData = JSON.parse(JSON.stringify({ subjects }));
+            for (const subject of exportData.subjects)
+                for (const cat of subject.categories)
+                    for (const item of cat.items)
+                        if (item.fileId && fileMap[item.fileId]) {
+                            item.fileName = fileMap[item.fileId].name;
+                            item.filePath = fileMap[item.fileId].path;
+                            item.fileType = fileMap[item.fileId].type;
+                        }
+
+            zip.file('data.json', JSON.stringify(exportData, null, 2));
+            return zip.generateAsync({ type: 'blob' });
+        }
+
+        async function importZip(store, zipBlob) {
+            const zip      = await JSZip.loadAsync(zipBlob);
+            const dataFile = zip.file('data.json');
+            if (!dataFile) throw new Error('data.json manquant');
+
+            const data = JSON.parse(await dataFile.async('string'));
+            if (!data.subjects || !Array.isArray(data.subjects)) throw new Error('Structure invalide');
+
+            await store.clearAllFiles();
+
+            for (const subject of data.subjects) {
+                for (const cat of subject.categories) {
+                    for (const item of cat.items) {
+                        if (item.fileId && item.filePath) {
+                            const zipFile = zip.file(item.filePath);
+                            if (zipFile) {
+                                const blob     = await zipFile.async('blob');
+                                const fileName = item.fileName || item.filePath.split('/').pop();
+                                const fileObj  = new File([blob], fileName, { type: item.fileType || '' });
+                                await store.saveFile(item.fileId, fileObj);
+                            } else {
+                                item.fileId = null;
+                            }
+                        }
+                        delete item.fileName;
+                        delete item.filePath;
+                        delete item.fileType;
+                    }
+                }
+            }
+            store.importData(JSON.stringify(data));
+        }
+
+        // =========================================================
+        // LOG HELPERS
+        // =========================================================
+        const logEl = document.getElementById('log');
+        let passed = 0, failed = 0;
+
+        function log(msg, cls = '') {
+            const span = document.createElement('span');
+            span.className = cls;
+            span.textContent = msg + '\n';
+            logEl.appendChild(span);
+        }
+        function assert(condition, label) {
+            if (condition) { log(`  ✅ PASS: ${label}`, 'pass'); passed++; }
+            else           { log(`  ❌ FAIL: ${label}`, 'fail'); failed++; }
+        }
+
+        // =========================================================
+        // TESTS
+        // =========================================================
+        async function runTests() {
+            // Setup : wipe ONLY test keys
+            localStorage.removeItem(TEST_STORAGE_KEY);
+            await T.clearAllFiles();
+
+            // ── Test 1 : Création ─────────────────────────────────
+            log('📋 Test 1: Création de données', 'info');
+            const subj = T.addSubject('Algorithmique');
+            assert(subj !== null, 'Matière créée');
+            T.addCategory(subj.id, 'CM');
+            T.addCategory(subj.id, 'TD');
+            assert(T.getSubject(subj.id).categories.length === 2, '2 catégories créées');
+            T.addItem(subj.id, 'CM', 'CM1 - Introduction');
+            T.addItem(subj.id, 'CM', 'CM2 - Complexité');
+            T.addItem(subj.id, 'TD', 'TD1 - Tris');
+            const cmItems = T.getSubject(subj.id).categories.find(c => c.name === 'CM').items;
+            assert(cmItems.length === 2, '2 items dans CM');
+
+            // ── Test 2 : Attacher le PDF ──────────────────────────
+            log('\n📎 Test 2: Import fichier PDF', 'info');
+            const pdfResp = await fetch('assets/CM1Algo2026-2027.pdf');
+            const pdfBlob = await pdfResp.blob();
+            const pdfFile = new File([pdfBlob], 'CM1Algo2026-2027.pdf', { type: 'application/pdf' });
+
+            const fileId = uuid();
+            await T.saveFile(fileId, pdfFile);
+            T.setItemFile(subj.id, 'CM', cmItems[0].id, fileId);
+
+            const cm1 = T.getSubject(subj.id).categories.find(c => c.name === 'CM').items[0];
+            assert(cm1.fileId === fileId, 'fileId enregistré sur CM1');
+            const stored = await T.getFile(fileId);
+            assert(stored !== null, 'Fichier dans IndexedDB (test)');
+            assert(stored.type === 'application/pdf', 'Type MIME correct');
+
+            // ── Test 3 : Export ZIP ───────────────────────────────
+            log('\n📦 Test 3: Export ZIP', 'info');
+            const zipBlob = await exportZip(T);
+            assert(zipBlob.size > 0, `ZIP généré (${(zipBlob.size / 1024).toFixed(1)} Ko)`);
+
+            const zv       = await JSZip.loadAsync(zipBlob);
+            const pdfInZip = zv.file('Algorithmique/CM/CM1Algo2026-2027.pdf');
+            assert(pdfInZip !== null, 'PDF présent dans le ZIP à Algorithmique/CM/');
+            assert(zv.file('data.json') !== null, 'data.json présent');
+
+            const expData = JSON.parse(await zv.file('data.json').async('string'));
+            const expCM1  = expData.subjects[0].categories.find(c => c.name === 'CM').items[0];
+            assert(expCM1.fileType === 'application/pdf', 'fileType dans data.json');
+            assert(expCM1.filePath === 'Algorithmique/CM/CM1Algo2026-2027.pdf', 'filePath dans data.json');
+
+            // ── Test 4 : Clear → Import ZIP ───────────────────────
+            log('\n🔄 Test 4: Clear complet → Import ZIP', 'info');
+            localStorage.removeItem(TEST_STORAGE_KEY);
+            await T.clearAllFiles();
+            assert(T.getSubjects().length === 0, 'localStorage vidé');
+            assert(Object.keys(await T.getAllFiles()).length === 0, 'IndexedDB vidée');
+
+            await importZip(T, zipBlob);
+            const afterImport = T.getSubjects();
+            assert(afterImport.length === 1, '1 matière restaurée');
+            assert(afterImport[0].name === 'Algorithmique', 'Nom matière correct');
+            const cm1R = afterImport[0].categories.find(c => c.name === 'CM').items[0];
+            assert(cm1R.fileId !== null, 'fileId non-null après import');
+            assert(!cm1R.fileName && !cm1R.filePath && !cm1R.fileType, 'Champs temporaires nettoyés');
+
+            // ── Test 5 : Fichier restauré ─────────────────────────
+            log('\n📂 Test 5: Fichier restauré dans IndexedDB', 'info');
+            const restored = await T.getFile(cm1R.fileId);
+            assert(restored !== null, 'Fichier retrouvé');
+            assert(restored.name === 'CM1Algo2026-2027.pdf', 'Nom correct');
+            assert(restored.type === 'application/pdf', 'Type MIME correct après import');
+            const restoredSize = (restored.blob.size || restored.blob.byteLength || 0);
+            assert(restoredSize > 200000, `Taille ~${(restoredSize / 1024).toFixed(0)} Ko (attendu ~237 Ko)`);
+
+            // ── Test 6 : Suppression item + fichier ───────────────
+            log('\n🗑️ Test 6: Suppression item → fichier supprimé', 'info');
+            const s6     = T.getSubjects()[0];
+            const cm6    = s6.categories.find(c => c.name === 'CM');
+            const item6  = cm6.items[0];
+            const fid6   = item6.fileId;
+            T.deleteItem(s6.id, 'CM', item6.id);
+            assert(T.getSubject(s6.id).categories.find(c => c.name === 'CM').items.length === 1, 'Item supprimé');
+            await new Promise(r => setTimeout(r, 300));
+            const gone = await T.getFile(fid6);
+            assert(!gone, 'Fichier supprimé de IndexedDB');
+
+            // ── Test 7 : Re-export sans le fichier supprimé ───────
+            log('\n📦 Test 7: Re-export après suppression', 'info');
+            const zip2 = await exportZip(T);
+            const zv2  = await JSZip.loadAsync(zip2);
+            assert(!zv2.file('Algorithmique/CM/CM1Algo2026-2027.pdf'), 'PDF absent du nouveau ZIP');
+            const d2   = JSON.parse(await zv2.file('data.json').async('string'));
+            assert(d2.subjects[0].categories.find(c => c.name === 'CM').items.length === 1, '1 seul item CM dans ZIP');
+
+            // ── Résumé ────────────────────────────────────────────
+            log('');
+            const s = document.createElement('div');
+            s.className = `summary ${failed === 0 ? 'ok' : 'ko'}`;
+            s.textContent = `${passed} passés · ${failed} échoués · total ${passed + failed}`;
+            logEl.appendChild(s);
+
+            // Cleanup — vide uniquement les clés de test
+            localStorage.removeItem(TEST_STORAGE_KEY);
+            await T.clearAllFiles();
+        }
+
+        runTests().catch(err => {
+            log(`\n💥 ERREUR: ${err.message}`, 'fail');
+            console.error(err);
+        });
+    </script>
+</body>
+</html>
