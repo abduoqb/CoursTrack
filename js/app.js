@@ -1,7 +1,7 @@
 import { Store } from './store.js';
 import { renderDashboard } from './dashboard.js';
 import { renderSubject } from './subject.js';
-import { toast } from './utils.js';
+import { toast } from './utils.js?v=3';
 
 // ===== Router =====
 

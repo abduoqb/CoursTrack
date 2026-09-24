@@ -1,4 +1,4 @@
-import { uuid } from './utils.js';
+import { uuid } from './utils.js?v=3';
 
 const STORAGE_KEY = 'suivit_cours_data';
 const DB_NAME = 'suivit_cours_files';
@@ -10,7 +10,19 @@ const DB_VERSION = 1;
 function load() {
     try {
         const data = localStorage.getItem(STORAGE_KEY);
-        return data ? JSON.parse(data) : { subjects: [] };
+        const parsed = data ? JSON.parse(data) : { subjects: [] };
+        // Migrate old examDate → exams[]
+        let migrated = false;
+        for (const s of parsed.subjects) {
+            if (!s.exams) s.exams = [];
+            if (s.examDate) {
+                s.exams.push({ id: uuid(), name: 'Examen', date: s.examDate, checklist: [] });
+                delete s.examDate;
+                migrated = true;
+            }
+        }
+        if (migrated) save(parsed);
+        return parsed;
     } catch {
         return { subjects: [] };
     }
@@ -112,11 +124,93 @@ export const Store = {
     },
 
     setExamDate(id, dateStr) {
+        // Legacy compat — kept for potential old callers
         const data = load();
         const subject = data.subjects.find(s => s.id === id);
         if (subject) {
             subject.examDate = dateStr || null;
             save(data);
+        }
+    },
+
+    // ===== Multi-Exam API =====
+
+    addExam(subjectId, name, dateStr) {
+        const data = load();
+        const subject = data.subjects.find(s => s.id === subjectId);
+        if (subject) {
+            if (!subject.exams) subject.exams = [];
+            const exam = { id: uuid(), name, date: dateStr, checklist: [] };
+            subject.exams.push(exam);
+            save(data);
+            return exam;
+        }
+        return null;
+    },
+
+    updateExam(subjectId, examId, updates) {
+        const data = load();
+        const subject = data.subjects.find(s => s.id === subjectId);
+        if (subject && subject.exams) {
+            const exam = subject.exams.find(e => e.id === examId);
+            if (exam) {
+                if (updates.name !== undefined) exam.name = updates.name;
+                if (updates.date !== undefined) exam.date = updates.date;
+                save(data);
+            }
+        }
+    },
+
+    deleteExam(subjectId, examId) {
+        const data = load();
+        const subject = data.subjects.find(s => s.id === subjectId);
+        if (subject && subject.exams) {
+            subject.exams = subject.exams.filter(e => e.id !== examId);
+            save(data);
+        }
+    },
+
+    addChecklistItem(subjectId, examId, text) {
+        const data = load();
+        const subject = data.subjects.find(s => s.id === subjectId);
+        if (subject && subject.exams) {
+            const exam = subject.exams.find(e => e.id === examId);
+            if (exam) {
+                const item = { id: uuid(), text, done: false };
+                exam.checklist.push(item);
+                save(data);
+                return item;
+            }
+        }
+        return null;
+    },
+
+    toggleChecklistItem(subjectId, examId, itemId) {
+        const data = load();
+        const subject = data.subjects.find(s => s.id === subjectId);
+        if (subject && subject.exams) {
+            const exam = subject.exams.find(e => e.id === examId);
+            if (exam) {
+                const item = exam.checklist.find(i => i.id === itemId);
+                if (item) {
+                    item.done = !item.done;
+                    save(data);
+                    return item.done;
+                }
+            }
+        }
+        return false;
+    },
+
+    deleteChecklistItem(subjectId, examId, itemId) {
+        const data = load();
+        const subject = data.subjects.find(s => s.id === subjectId);
+        if (subject && subject.exams) {
+            const exam = subject.exams.find(e => e.id === examId);
+            if (exam) {
+                exam.checklist = exam.checklist.filter(i => i.id !== itemId);
+                save(data);
+            }
         }
     },
 

@@ -1,5 +1,5 @@
 import { Store } from './store.js';
-import { calcProgress, progressClass, uuid, toast, escapeHtml, examInfo } from './utils.js';
+import { calcProgress, progressClass, uuid, toast, escapeHtml, examInfo } from './utils.js?v=3';
 
 export function renderSubject(subjectId) {
     const app = document.getElementById('app');
@@ -24,27 +24,9 @@ export function renderSubject(subjectId) {
         doneItems += cat.items.filter(i => i.done).length;
     }
 
-    // Exam date display
-    const eInfo = examInfo(subject.examDate);
-    let examHtml = '';
-    if (eInfo) {
-        const dateFormatted = new Date(subject.examDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-        examHtml = `
-            <div class="exam-banner exam-banner-${eInfo.urgency}">
-                <div class="exam-banner-left">
-                    <span class="exam-banner-icon">${eInfo.icon}</span>
-                    <div>
-                        <span class="exam-banner-label">Examen</span>
-                        <span class="exam-banner-date">${dateFormatted}</span>
-                    </div>
-                </div>
-                <div class="exam-banner-right">
-                    <span class="exam-banner-countdown">${eInfo.label}</span>
-                    <button class="btn-icon" id="btn-clear-exam" title="Retirer la date">×</button>
-                </div>
-            </div>
-        `;
-    }
+    // Exams section
+    const exams = subject.exams || [];
+    const examsHtml = exams.length > 0 ? exams.map(exam => renderExamCard(exam)).join('') : '';
 
     app.innerHTML = `
         <div class="subject-detail">
@@ -54,7 +36,11 @@ export function renderSubject(subjectId) {
             </a>
             <h1 class="subject-title">${escapeHtml(subject.name)}</h1>
 
-            ${examHtml}
+            ${examsHtml ? `
+            <div class="exams-section">
+                ${examsHtml}
+            </div>
+            ` : ''}
 
             <div class="subject-progress-summary">
                 <span class="progress-text">${doneItems}/${totalItems}</span>
@@ -66,9 +52,9 @@ export function renderSubject(subjectId) {
 
             <div class="subject-actions">
                 <button class="btn btn-primary" id="btn-add-category">+ Catégorie</button>
-                <button class="btn btn-secondary" id="btn-set-exam">
+                <button class="btn btn-secondary" id="btn-add-exam">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    ${subject.examDate ? 'Modifier examen' : 'Date d\'examen'}
+                    + Examen
                 </button>
             </div>
 
@@ -85,6 +71,61 @@ export function renderSubject(subjectId) {
     `;
 
     bindEvents(subjectId);
+}
+
+function renderExamCard(exam) {
+    const eInfo = examInfo(exam.date);
+    if (!eInfo) return '';
+
+    const dateFormatted = new Date(exam.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const checkDone = exam.checklist.filter(c => c.done).length;
+    const checkTotal = exam.checklist.length;
+    const readyPct = checkTotal > 0 ? Math.round((checkDone / checkTotal) * 100) : 0;
+
+    return `
+        <div class="exam-card exam-card-${eInfo.urgency}" data-exam-id="${exam.id}">
+            <div class="exam-card-header">
+                <div class="exam-card-left">
+                    <span class="exam-card-icon">${eInfo.icon}</span>
+                    <div>
+                        <span class="exam-card-name">${escapeHtml(exam.name)}</span>
+                        <span class="exam-card-date">${dateFormatted}</span>
+                    </div>
+                </div>
+                <div class="exam-card-right">
+                    <span class="exam-card-countdown">${eInfo.label}</span>
+                    <button class="btn-icon delete-exam-btn" data-exam-id="${exam.id}" title="Supprimer l'examen">×</button>
+                </div>
+            </div>
+
+            ${checkTotal > 0 ? `
+            <div class="exam-ready-bar">
+                <div class="exam-ready-info">
+                    <span>Préparation</span>
+                    <span class="exam-ready-pct">${readyPct}%</span>
+                </div>
+                <div class="progress-bar progress-bar-sm">
+                    <div class="progress-fill ${readyPct === 100 ? 'progress-high' : readyPct >= 50 ? 'progress-mid' : 'progress-low'}" style="width: ${readyPct}%"></div>
+                </div>
+            </div>
+            ` : ''}
+
+            <div class="exam-checklist" data-exam-id="${exam.id}">
+                ${exam.checklist.map(item => `
+                    <label class="checklist-item">
+                        <input type="checkbox" class="checklist-cb" data-exam-id="${exam.id}" data-item-id="${item.id}" ${item.done ? 'checked' : ''}>
+                        <span class="checklist-text ${item.done ? 'done' : ''}">${escapeHtml(item.text)}</span>
+                        <button class="btn-icon-sm delete-checklist-btn" data-exam-id="${exam.id}" data-item-id="${item.id}" title="Retirer">×</button>
+                    </label>
+                `).join('')}
+            </div>
+
+            <div class="exam-add-checklist">
+                <input type="text" class="checklist-input" data-exam-id="${exam.id}" placeholder="Ajouter une notion à réviser…">
+                <button class="btn-icon-sm add-checklist-btn" data-exam-id="${exam.id}" title="Ajouter">+</button>
+            </div>
+        </div>
+    `;
 }
 
 function renderCategory(subjectId, category) {
@@ -153,20 +194,55 @@ function bindEvents(subjectId) {
         showAddCategoryModal(subjectId);
     });
 
-    // Exam date
-    document.getElementById('btn-set-exam').addEventListener('click', () => {
-        showExamDateModal(subjectId);
+    document.getElementById('btn-add-exam').addEventListener('click', () => {
+        showAddExamModal(subjectId);
     });
 
-    const clearExamBtn = document.getElementById('btn-clear-exam');
-    if (clearExamBtn) {
-        clearExamBtn.addEventListener('click', () => {
-            Store.setExamDate(subjectId, null);
-            toast('Date d\'examen retirée');
+    // Exam checklist checkboxes
+    app.querySelectorAll('.checklist-cb').forEach(cb => {
+        cb.addEventListener('change', () => {
+            Store.toggleChecklistItem(subjectId, cb.dataset.examId, cb.dataset.itemId);
             renderSubject(subjectId);
         });
-    }
+    });
 
+    // Delete checklist item
+    app.querySelectorAll('.delete-checklist-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            Store.deleteChecklistItem(subjectId, btn.dataset.examId, btn.dataset.itemId);
+            renderSubject(subjectId);
+        });
+    });
+
+    // Add checklist item (button + Enter key)
+    app.querySelectorAll('.add-checklist-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const input = app.querySelector(`.checklist-input[data-exam-id="${btn.dataset.examId}"]`);
+            addChecklistFromInput(subjectId, btn.dataset.examId, input);
+        });
+    });
+
+    app.querySelectorAll('.checklist-input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                addChecklistFromInput(subjectId, input.dataset.examId, input);
+            }
+        });
+    });
+
+    // Delete exam
+    app.querySelectorAll('.delete-exam-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (confirm('Supprimer cet examen ?')) {
+                Store.deleteExam(subjectId, btn.dataset.examId);
+                toast('Examen supprimé');
+                renderSubject(subjectId);
+            }
+        });
+    });
+
+    // Category / Item events (unchanged)
     app.querySelectorAll('.item-checkbox').forEach(cb => {
         cb.addEventListener('change', () => {
             Store.toggleItem(subjectId, cb.dataset.category, cb.dataset.itemId);
@@ -219,6 +295,19 @@ function bindEvents(subjectId) {
             }
         });
     });
+}
+
+function addChecklistFromInput(subjectId, examId, input) {
+    const text = input.value.trim();
+    if (text) {
+        Store.addChecklistItem(subjectId, examId, text);
+        renderSubject(subjectId);
+        // Re-focus the input after re-render
+        setTimeout(() => {
+            const newInput = document.querySelector(`.checklist-input[data-exam-id="${examId}"]`);
+            if (newInput) newInput.focus();
+        }, 50);
+    }
 }
 
 // ===== Modals =====
@@ -301,20 +390,21 @@ function showAddItemModal(subjectId, categoryName) {
     });
 }
 
-function showExamDateModal(subjectId) {
-    const subject = Store.getSubject(subjectId);
+function showAddExamModal(subjectId) {
     const overlay = document.getElementById('modal-overlay');
-    document.getElementById('modal-title').textContent = 'Date d\'examen';
+    document.getElementById('modal-title').textContent = 'Nouvel examen';
     document.getElementById('modal-body').innerHTML = `
-        <label for="exam-date">Date de l'examen</label>
-        <input type="date" id="exam-date" value="${subject.examDate || ''}"
+        <label for="exam-name">Nom de l'examen</label>
+        <input type="text" id="exam-name" placeholder="ex : Partiel, CC1, Rattrapage…" autofocus>
+        <label for="exam-date" style="margin-top: 0.75rem; display: block;">Date</label>
+        <input type="date" id="exam-date"
                style="width:100%; padding:0.625rem 0.875rem; border:1px solid var(--border);
                       border-radius:var(--radius-sm); font-family:inherit; font-size:0.875rem;
                       outline:none; color:var(--text); cursor:pointer;">
     `;
 
     overlay.classList.remove('hidden');
-    setTimeout(() => document.getElementById('exam-date').focus(), 100);
+    setTimeout(() => document.getElementById('exam-name').focus(), 100);
 
     const cleanup = () => {
         overlay.classList.add('hidden');
@@ -325,12 +415,17 @@ function showExamDateModal(subjectId) {
     };
 
     const doConfirm = () => {
-        const dateVal = document.getElementById('exam-date').value;
-        if (dateVal) {
-            Store.setExamDate(subjectId, dateVal);
-            toast('Date d\'examen enregistrée');
+        const name = document.getElementById('exam-name').value.trim();
+        const date = document.getElementById('exam-date').value;
+        if (name && date) {
+            Store.addExam(subjectId, name, date);
+            toast('Examen ajouté');
             cleanup();
             renderSubject(subjectId);
+        } else if (!name) {
+            toast('Donne un nom à l\'examen');
+        } else {
+            toast('Choisis une date');
         }
     };
 

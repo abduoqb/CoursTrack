@@ -1,5 +1,5 @@
 import { Store } from './store.js';
-import { calcProgress, progressClass, escapeHtml, examInfo } from './utils.js';
+import { calcProgress, progressClass, escapeHtml, examInfo } from './utils.js?v=3';
 
 // Couleurs pastel pour différencier les matières
 const SUBJECT_COLORS = [
@@ -34,12 +34,20 @@ export function renderDashboard() {
         return hasItems && calcProgress(s) < 50;
     });
 
-    // Examens à venir (triés par date, exclut les passés)
-    const upcomingExams = subjects
-        .filter(s => s.examDate)
-        .map(s => ({ subject: s, info: examInfo(s.examDate) }))
-        .filter(e => e.info && e.info.days >= 0)
-        .sort((a, b) => a.info.days - b.info.days);
+    // Examens à venir (tous les examens de toutes les matières, triés, exclut les passés)
+    const upcomingExams = [];
+    for (const s of subjects) {
+        if (!s.exams) continue;
+        for (const exam of s.exams) {
+            const info = examInfo(exam.date);
+            if (info && info.days >= 0) {
+                const checkDone = exam.checklist.filter(c => c.done).length;
+                const checkTotal = exam.checklist.length;
+                upcomingExams.push({ subject: s, exam, info, checkDone, checkTotal });
+            }
+        }
+    }
+    upcomingExams.sort((a, b) => a.info.days - b.info.days);
 
     app.innerHTML = `
         <!-- Résumé global -->
@@ -65,11 +73,15 @@ export function renderDashboard() {
             </h3>
             <div class="exams-list">
                 ${upcomingExams.map(e => {
-                    const dateFormatted = new Date(e.subject.examDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' });
+                    const dateFormatted = new Date(e.exam.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' });
+                    const readyPct = e.checkTotal > 0 ? Math.round((e.checkDone / e.checkTotal) * 100) : null;
                     return `
                     <div class="exam-row exam-${e.info.urgency}">
                         <span class="exam-icon">${e.info.icon}</span>
-                        <span class="exam-name">${escapeHtml(e.subject.name)}</span>
+                        <div class="exam-row-info">
+                            <span class="exam-name">${escapeHtml(e.subject.name)} — ${escapeHtml(e.exam.name)}</span>
+                            ${readyPct !== null ? `<span class="exam-ready">Prêt à ${readyPct}%</span>` : ''}
+                        </div>
                         <span class="exam-date">${dateFormatted}</span>
                         <span class="exam-countdown">${e.info.label}</span>
                     </div>
@@ -134,14 +146,18 @@ function renderCard(subject, index) {
     }
     const remaining = totalItems - doneItems;
 
-    // Exam badge
-    const eInfo = examInfo(subject.examDate);
+    // Nearest upcoming exam badge
+    const exams = (subject.exams || [])
+        .map(e => ({ exam: e, info: examInfo(e.date) }))
+        .filter(e => e.info && e.info.days >= 0)
+        .sort((a, b) => a.info.days - b.info.days);
+
     let examBadgeHtml = '';
-    if (eInfo) {
-        if (eInfo.urgency === 'past') {
-            examBadgeHtml = `<span class="exam-badge exam-badge-past">Examen passé</span>`;
-        } else {
-            examBadgeHtml = `<span class="exam-badge exam-badge-${eInfo.urgency}">${eInfo.icon} ${eInfo.label}</span>`;
+    if (exams.length > 0) {
+        const nearest = exams[0];
+        examBadgeHtml = `<span class="exam-badge exam-badge-${nearest.info.urgency}">${nearest.info.icon} ${nearest.info.label}</span>`;
+        if (exams.length > 1) {
+            examBadgeHtml += `<span class="exam-badge exam-badge-calm">+${exams.length - 1} examen${exams.length > 2 ? 's' : ''}</span>`;
         }
     }
 
