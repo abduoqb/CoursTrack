@@ -105,7 +105,7 @@ function renderExamCard(exam) {
                     <span class="exam-ready-pct">${readyPct}%</span>
                 </div>
                 <div class="progress-bar progress-bar-sm">
-                    <div class="progress-fill ${readyPct === 100 ? 'progress-high' : readyPct >= 50 ? 'progress-mid' : 'progress-low'}" style="width: ${readyPct}%"></div>
+                    <div class="progress-fill ${readyPct === 100 ? 'high' : readyPct >= 50 ? 'mid' : 'low'}" style="width: ${readyPct}%"></div>
                 </div>
             </div>
             ` : ''}
@@ -210,6 +210,7 @@ function bindEvents(subjectId) {
     app.querySelectorAll('.delete-checklist-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             Store.deleteChecklistItem(subjectId, btn.dataset.examId, btn.dataset.itemId);
             renderSubject(subjectId);
         });
@@ -267,8 +268,10 @@ function bindEvents(subjectId) {
 
     app.querySelectorAll('.delete-item-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            Store.deleteItem(subjectId, btn.dataset.category, btn.dataset.itemId);
-            renderSubject(subjectId);
+            if (confirm('Supprimer cet élément ?')) {
+                Store.deleteItem(subjectId, btn.dataset.category, btn.dataset.itemId);
+                renderSubject(subjectId);
+            }
         });
     });
 
@@ -287,11 +290,14 @@ function bindEvents(subjectId) {
 
     app.querySelectorAll('.open-file-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
+            const tab = window.open('about:blank', '_blank');
             const fileData = await Store.getFile(btn.dataset.fileId);
             if (fileData) {
                 const blob = new Blob([fileData.blob], { type: fileData.type });
                 const url = URL.createObjectURL(blob);
-                window.open(url, '_blank');
+                tab.location.href = url;
+            } else {
+                tab.close();
             }
         });
     });

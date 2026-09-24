@@ -244,6 +244,19 @@ export const Store = {
         }
     },
 
+    renameCategory(subjectId, oldName, newName) {
+        const data = load();
+        const subject = data.subjects.find(s => s.id === subjectId);
+        if (subject) {
+            if (subject.categories.some(c => c.name.toLowerCase() === newName.toLowerCase() && c.name !== oldName)) {
+                return false;
+            }
+            const cat = subject.categories.find(c => c.name === oldName);
+            if (cat) { cat.name = newName; save(data); return true; }
+        }
+        return false;
+    },
+
     addItem(subjectId, categoryName, title) {
         const data = load();
         const subject = data.subjects.find(s => s.id === subjectId);
@@ -257,6 +270,19 @@ export const Store = {
             }
         }
         return null;
+    },
+
+    renameItem(subjectId, categoryName, itemId, newTitle) {
+        const data = load();
+        const subject = data.subjects.find(s => s.id === subjectId);
+        if (subject) {
+            const cat = subject.categories.find(c => c.name === categoryName);
+            if (cat) {
+                const item = cat.items.find(i => i.id === itemId);
+                if (item) { item.title = newTitle; save(data); return true; }
+            }
+        }
+        return false;
     },
 
     deleteItem(subjectId, categoryName, itemId) {

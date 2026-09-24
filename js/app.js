@@ -3,107 +3,147 @@ import { renderDashboard } from './dashboard.js';
 import { renderSubject } from './subject.js';
 import { toast } from './utils.js?v=3';
 
+// ===== UI Helpers =====
+
+function showLoading(msg) {
+    let div = document.getElementById('loading-overlay');
+    if (!div) {
+        div = document.createElement('div');
+        div.id = 'loading-overlay';
+        div.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.8);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+        div.innerHTML = `<div class="spinner" style="width:40px;height:40px;border:4px solid var(--blue-light);border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite;"></div>
+        <p id="loading-msg" style="margin-top:1rem;font-weight:600;color:var(--blue-dark);font-family:var(--font);"></p>
+        <style>@keyframes spin { to { transform: rotate(360deg); } }</style>`;
+        document.body.appendChild(div);
+    }
+    document.getElementById('loading-msg').textContent = msg;
+    div.style.display = 'flex';
+}
+
+function hideLoading() {
+    const div = document.getElementById('loading-overlay');
+    if (div) div.style.display = 'none';
+}
+
 // ===== Router =====
 
 function route() {
-    const hash = window.location.hash || '#/';
-
-    if (hash === '#/' || hash === '' || hash === '#') {
+    const hash = window.location.hash;
+    const app = document.getElementById('app');
+    
+    if (!hash || hash === '#/') {
         renderDashboard();
     } else if (hash.startsWith('#/subject/')) {
-        const id = hash.replace('#/subject/', '');
-        renderSubject(id);
+        const id = hash.split('/')[2];
+        if (id) renderSubject(id);
+        else renderDashboard();
     } else {
         renderDashboard();
     }
 }
 
-// ===== Sanitize folder/file names =====
-
-function sanitizeName(name) {
-    return name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'sans-nom';
-}
-
 // ===== ZIP Export =====
 
+function sanitizeName(name) {
+    return name.replace(/[^a-z0-9àâçéèêëîïôûùüÿñæœ\s_-]/gi, '').trim() || 'Dossier';
+}
+
 async function exportZip() {
-    const zip = new JSZip();
-    const subjects = Store.getSubjects();
-    const allFiles = await Store.getAllFiles();
+    try {
+        showLoading('Préparation de l\'archive...');
+        // allow UI to update
+        await new Promise(r => setTimeout(r, 50));
+        
+        const zip = new window.JSZip();
+        const subjects = Store.getSubjects();
+        const allFiles = await Store.getAllFiles();
 
-    // Build a fileId → path map so we can enrich data.json
-    const fileMap = {}; // fileId → { path, name }
+        const fileMap = {};
 
-    for (const subject of subjects) {
-        const subjectFolder = sanitizeName(subject.name);
-        for (const cat of subject.categories) {
-            const catFolder = sanitizeName(cat.name);
-            for (const item of cat.items) {
-                if (item.fileId && allFiles[item.fileId]) {
-                    const fileData = allFiles[item.fileId];
-                    const fileName = fileData.name || `${item.id}.bin`;
-                    const filePath = `${subjectFolder}/${catFolder}/${fileName}`;
-
-                    // Store the blob in the ZIP
-                    zip.file(filePath, fileData.blob);
-
-                    // Keep track for data.json
-                    fileMap[item.fileId] = { path: filePath, name: fileName, type: fileData.type || '' };
+        for (const subject of subjects) {
+            const subjectFolder = sanitizeName(subject.name);
+            for (const cat of subject.categories) {
+                const catFolder = sanitizeName(cat.name);
+                for (const item of cat.items) {
+                    if (item.fileId && allFiles[item.fileId]) {
+                        const fileData = allFiles[item.fileId];
+                        const fileName = fileData.name || `${item.id}.bin`;
+                        // FIX: Add item ID to path to avoid collisions
+                        const filePath = `${subjectFolder}/${catFolder}/${item.id}_${fileName}`;
+                        
+                        zip.file(filePath, fileData.blob);
+                        fileMap[item.fileId] = { path: filePath, name: fileName, type: fileData.type || '' };
+                    }
                 }
             }
         }
-    }
 
-    // Enrich metadata: add fileName to each item that has a file
-    const exportData = JSON.parse(JSON.stringify({ subjects }));
-    for (const subject of exportData.subjects) {
-        for (const cat of subject.categories) {
-            for (const item of cat.items) {
-                if (item.fileId && fileMap[item.fileId]) {
-                    item.fileName = fileMap[item.fileId].name;
-                    item.filePath = fileMap[item.fileId].path;
-                    item.fileType = fileMap[item.fileId].type;
+        const exportData = JSON.parse(JSON.stringify({ subjects }));
+        for (const subject of exportData.subjects) {
+            for (const cat of subject.categories) {
+                for (const item of cat.items) {
+                    if (item.fileId && fileMap[item.fileId]) {
+                        item.fileName = fileMap[item.fileId].name;
+                        item.filePath = fileMap[item.fileId].path;
+                        item.fileType = fileMap[item.fileId].type;
+                    }
                 }
             }
         }
+
+        zip.file('data.json', JSON.stringify(exportData, null, 2));
+
+        showLoading('Compression...');
+        await new Promise(r => setTimeout(r, 50));
+        
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `courstrack_${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Delay revoke to avoid interrupting download
+        setTimeout(() => {
+            URL.revokeObjectURL(url);
+            if (document.body.contains(a)) document.body.removeChild(a);
+        }, 2000);
+        
+        toast('Données exportées avec succès', 'success');
+    } catch (err) {
+        console.error('Export ZIP error:', err);
+        toast('Erreur lors de l\'exportation', 'error');
+    } finally {
+        hideLoading();
     }
-
-    zip.file('data.json', JSON.stringify(exportData, null, 2));
-
-    const blob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `courstrack_${new Date().toISOString().slice(0, 10)}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast('Données exportées (ZIP)');
 }
 
 // ===== ZIP Import =====
 
 async function importZip(file) {
     try {
-        const zip = await JSZip.loadAsync(file);
+        showLoading('Analyse de l\'archive...');
+        await new Promise(r => setTimeout(r, 50));
+        
+        const zip = await window.JSZip.loadAsync(file);
 
-        // Read data.json
         const dataFile = zip.file('data.json');
         if (!dataFile) {
-            toast('ZIP invalide : data.json manquant');
-            return;
+            throw new Error('data.json manquant');
         }
 
         const jsonStr = await dataFile.async('string');
         const data = JSON.parse(jsonStr);
         if (!data.subjects || !Array.isArray(data.subjects)) {
-            toast('ZIP invalide : structure incorrecte');
-            return;
+            throw new Error('structure JSON incorrecte');
         }
 
-        // Clear existing files in IndexedDB
-        await Store.clearAllFiles();
-
-        // Restore files from ZIP into IndexedDB
+        showLoading('Extraction des fichiers...');
+        await new Promise(r => setTimeout(r, 50));
+        
+        // Extract all files from ZIP first into memory to ensure safety before clearing DB
+        const extractedFiles = [];
         for (const subject of data.subjects) {
             for (const cat of subject.categories) {
                 for (const item of cat.items) {
@@ -113,14 +153,14 @@ async function importZip(file) {
                             const blob = await zipFile.async('blob');
                             const fileName = item.fileName || item.filePath.split('/').pop();
                             const mimeType = item.fileType || '';
-                            const fileObj = new File([blob], fileName, { type: mimeType });
-                            await Store.saveFile(item.fileId, fileObj);
+                            extractedFiles.push({
+                                id: item.fileId,
+                                fileObj: new File([blob], fileName, { type: mimeType })
+                            });
                         } else {
-                            // File referenced but not found in ZIP → reset
                             item.fileId = null;
                         }
                     }
-                    // Clean up export-only fields
                     delete item.fileName;
                     delete item.filePath;
                     delete item.fileType;
@@ -128,13 +168,20 @@ async function importZip(file) {
             }
         }
 
-        // Save metadata
+        showLoading('Sauvegarde...');
+        await Store.clearAllFiles();
+        for (const f of extractedFiles) {
+            await Store.saveFile(f.id, f.fileObj);
+        }
+
         Store.importData(JSON.stringify(data));
-        toast('Données importées avec succès (ZIP)');
+        toast('Données importées avec succès', 'success');
         route();
     } catch (err) {
         console.error('Import ZIP error:', err);
-        toast('Erreur lors de l\'import');
+        toast('Fichier invalide ou corrompu', 'error');
+    } finally {
+        hideLoading();
     }
 }
 
@@ -145,10 +192,10 @@ function importJSON(file) {
     reader.onload = () => {
         const success = Store.importData(reader.result);
         if (success) {
-            toast('Données importées (JSON, sans fichiers)');
+            toast('Données importées (sans fichiers)', 'info');
             route();
         } else {
-            toast('Fichier invalide');
+            toast('Fichier JSON invalide', 'error');
         }
     };
     reader.readAsText(file);
@@ -159,17 +206,16 @@ function importJSON(file) {
 function init() {
     window.addEventListener('hashchange', route);
 
-    // Export ZIP
     document.getElementById('btn-export').addEventListener('click', () => {
         exportZip();
     });
 
-    // Import ZIP or JSON
     document.getElementById('btn-import').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
-        if (file.name.endsWith('.zip')) {
+        
+        // Case insensitive check
+        if (file.name.toLowerCase().endsWith('.zip')) {
             importZip(file);
         } else {
             importJSON(file);
