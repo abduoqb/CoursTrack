@@ -1,126 +1,122 @@
-﻿# CoursTrack
+# Cahier
 
-> **Organise tes cours, progresse facilement.**
+> **Un carnet de cours. Rien de plus, rien de moins.**
 
-Application web minimaliste pour suivre sa progression dans ses cours universitaires — sans inscription, sans serveur, tout tourne dans le navigateur.
+Application web minimaliste pour suivre ce que tu fais dans tes études — sans compte, sans serveur, tout dans le navigateur. Sauvegarde complète, restore complète. Accès hors ligne une fois chargé.
 
-![CoursTrack](assets/logo.png)
-
----
-
-## Fonctionnalités
-
-- **Dashboard** — vue d'ensemble de toutes les matières avec barre de progression globale
-- **Matières** — ajouter/supprimer autant de matières que nécessaire
-- **Catégories personnalisées** — TD, CM, TP, Projet, Examen… tu définis les tiennes
-- **Suivi par élément** — cocher/décocher chaque cours, TP, devoir
-- **Fichiers liés** — attacher un PDF (ou tout autre fichier) à chaque élément
-- **Export ZIP** — sauvegarde complète : données + fichiers organisés par `matière/catégorie/fichier`
-- **Import ZIP** — restauration complète depuis un ZIP exporté, zéro donnée perdue
-- **Alerte de retard** — bandeau orange si des matières sont en retard (< 50%)
-- **100% offline** — aucune connexion requise après le premier chargement
+**Déployée sur [cahier-opal.vercel.app](https://cahier-opal.vercel.app/#/)**
 
 ---
 
-## Stack technique
+## Ce qu'elle fait
 
-| Couche | Technologie |
+- **Tes matières** — une liste, c'est tout. Ajoute/supprime comme tu veux.
+- **Catégories** — CM, TD, TP, Projets, ce que tu veux. À toi de les créer.
+- **Coches** — chaque cours que tu fais, tu le coches. La barre avance.
+- **Fichiers** — attache un PDF (ou n'importe quel fichier) à chaque cours.
+- **Examens** — date + liste de notions à réviser. Suivi de ta préparation.
+- **Sauvegarde locale** — tout vit dans ton navigateur. Zéro donnée envoyée ailleurs.
+- **Export/Import ZIP** — dump complet matières + fichiers. À toi de le garder.
+- **Hors ligne** — pas de connexion après le premier chargement.
+
+---
+
+## Tech
+
+| | |
 |---|---|
-| Interface | HTML5 + CSS3 + JavaScript (ES Modules) |
-| Données | `localStorage` (métadonnées) + `IndexedDB` (fichiers) |
-| Export/Import | [JSZip 3.10](https://stuk.github.io/jszip/) |
-| Typographie | [Inter](https://fonts.google.com/specimen/Inter) (Google Fonts) |
-| Routing | Hash-based (`#/`, `#/subject/:id`) |
-| Versioning | Git + GitHub |
+| **Frontend** | HTML5 + CSS3 + JavaScript (ES Modules, zéro framework) |
+| **Données** | `localStorage` (JSON) + `IndexedDB` (fichiers) |
+| **Typographie** | Fraunces (titres) + Inter (corps) |
+| **Files** | [JSZip 3.10](https://stuk.github.io/jszip/) pour export/import |
+| **Deploy** | Vercel (static) |
 
-Aucun framework, aucun bundler, aucune dépendance npm. Zéro build step.
-
----
-
-## Structure du projet
-
-```
-suivit_cours/
-├── index.html          # Point d'entrée SPA
-├── css/
-│   └── style.css       # Design system CoursTrack (variables, composants)
-├── js/
-│   ├── app.js          # Router + logique export/import ZIP
-│   ├── store.js        # CRUD localStorage + IndexedDB
-│   ├── dashboard.js    # Vue dashboard
-│   ├── subject.js      # Vue détail matière
-│   └── utils.js        # uuid(), calcProgress(), toast(), escapeHtml()
-├── assets/
-│   └── logo.png        # Logo CoursTrack
-├── test.html           # Suite de tests (isolée, ne touche pas aux vraies données)
-└── README.md
-```
+Zéro npm, zéro build. Ouvre l'HTML, ça marche.
 
 ---
 
-## Lancer l'application
+## Lancer localement
 
-Comme l'app utilise des **ES Modules**, elle ne peut pas être ouverte directement via `file://`. Il faut un serveur local :
+L'app utilise **ES Modules**, donc elle ne peut pas être ouverte en `file://`. Besoin d'un serveur :
 
 ```bash
-# Python (intégré)
+# Python
 python -m http.server 8080
 
-# Node.js
+# Ou Node
 npx serve .
 ```
 
-Puis ouvre **http://localhost:8080**
+Puis **http://localhost:8080**
 
 ---
 
-## Format d'export ZIP
+## Structure
 
 ```
-courstrack_2026-09-23.zip
-├── data.json                        ← toutes les métadonnées
-├── Mathématiques/
+.
+├── index.html                 # Point d'entrée SPA
+├── css/style.css              # Design system (variables, composants)
+├── js/
+│   ├── app.js                 # Router + export/import ZIP
+│   ├── store.js               # localStorage + IndexedDB CRUD
+│   ├── dashboard.js           # Vue d'accueil
+│   ├── subject.js             # Vue détail matière
+│   └── utils.js               # Utilitaires (uuid, progress, toast…)
+├── assets/
+│   └── logo.png               # Logo historique
+└── test.html                  # Suite de tests (données isolées)
+```
+
+---
+
+## Format ZIP export
+
+```
+cahier_2026-09-26.zip
+├── data.json                  ← tous les métadonnées
+├── Maths/
 │   ├── CM/
-│   │   └── cours1.pdf
+│   │   └── cours_1.pdf
 │   └── TD/
-│       └── td1.pdf
-└── Algorithmique/
+│       └── td_1.pdf
+└── Algo/
     └── TP/
-        └── rapport.docx
+        └── tp_4.docx
 ```
 
-L'import depuis un ancien `.json` (format précédent) reste supporté (rétrocompatible, sans fichiers).
+Import depuis un vieux `.json` reste supporté (sans fichiers, mais ça marche).
 
 ---
 
 ## Tests
 
-Ouvre **http://localhost:8080/test.html** pour lancer la suite de tests automatisés.
+```bash
+http://localhost:8080/test.html
+```
 
-Les tests utilisent des clés **complètement isolées** (`_test_cours_data` / `_test_cours_files`) — tes données réelles ne sont jamais touchées.
+Les tests roulent sur des clés séparées (`_test_*`) — tes données réelles ne sont jamais touchées.
 
-**Scénarios testés :**
-1. Création matière / catégories / items
-2. Attachement d'un PDF à un item
-3. Export ZIP avec arborescence correcte
-4. Clear total → Import ZIP → données et fichiers restaurés
-5. Vérification MIME type et taille du fichier restauré
-6. Suppression item → fichier supprimé de IndexedDB
-7. Re-export → fichier supprimé absent du nouveau ZIP
+**Couverts :**
+- Création matière, catégories, items
+- Attachement fichier + MIME/taille préservés
+- Export ZIP : structure arborescence
+- Clear → Import → données restaurées
+- Suppression item : fichier disparu de IndexedDB
+- Re-export : fichier supprimé n'apparaît plus
 
 ---
 
 ## Roadmap
 
-- [ ] Migration VPS + base de données (PostgreSQL)
-- [ ] Accès multi-appareils (synchronisation)
-- [ ] Version mobile (PWA)
-- [ ] Statistiques de progression (graphiques, historique)
-- [ ] Notifications de rappel
+- [ ] **Sync multi-appareils** — Google Drive comme backend (study en cours)
+- [ ] PWA / mode hors ligne amélioré
+- [ ] Statistiques (graphiques, historique)
+- [ ] Rappels
 - [ ] Mode sombre
 
 ---
 
 ## Licence
 
-Usage personnel. Projet étudiant en cours de développement.
+Usage personnel. Projet étudiant en développement.
