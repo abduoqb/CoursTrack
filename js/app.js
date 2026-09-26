@@ -1,6 +1,6 @@
 import { Store } from './store.js';
-import { renderDashboard } from './dashboard.js';
-import { renderSubject } from './subject.js';
+import { renderDashboard } from './dashboard.js?v=5';
+import { renderSubject } from './subject.js?v=4';
 import { toast } from './utils.js?v=3';
 
 // ===== UI Helpers =====
@@ -40,6 +40,8 @@ function route() {
     } else {
         renderDashboard();
     }
+
+    window.scrollTo(0, 0);
 }
 
 // ===== ZIP Export =====

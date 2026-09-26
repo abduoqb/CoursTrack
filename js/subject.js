@@ -31,42 +31,68 @@ export function renderSubject(subjectId) {
     app.innerHTML = `
         <div class="subject-detail">
             <a class="back-link" href="#/">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                Retour
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                Toutes les matières
             </a>
-            <h1 class="subject-title">${escapeHtml(subject.name)}</h1>
 
-            ${examsHtml ? `
-            <div class="exams-section">
-                ${examsHtml}
-            </div>
-            ` : ''}
+            <section class="subject-page-heading" aria-labelledby="subject-title">
+                <div class="subject-heading-copy">
+                    <span class="eyebrow">VOTRE MATIÈRE</span>
+                    <h1 class="subject-title" id="subject-title">${escapeHtml(subject.name)}</h1>
+                    <p>Retrouvez ici vos cours, vos documents et vos révisions.</p>
+                </div>
+                <div class="subject-actions">
+                    <button class="btn btn-secondary" id="btn-add-exam">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                        Ajouter un examen
+                    </button>
+                    <button class="btn btn-primary" id="btn-add-category">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        Ajouter une catégorie
+                    </button>
+                </div>
+            </section>
 
-            <div class="subject-progress-summary">
-                <span class="progress-text">${doneItems}/${totalItems}</span>
-                <div class="progress-bar progress-bar-lg">
+            <section class="subject-progress-summary" aria-label="Progression de la matière">
+                <div class="subject-progress-copy">
+                    <span>Votre progression</span>
+                    <strong>${doneItems} cours terminé${doneItems > 1 ? 's' : ''} <small>sur ${totalItems}</small></strong>
+                </div>
+                <div class="subject-progress-track progress-bar" role="progressbar" aria-label="Progression" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
                     <div class="progress-fill ${pClass}" style="width: ${progress}%"></div>
                 </div>
-                <span class="progress-text">${progress}%</span>
-            </div>
+                <span class="subject-progress-percent">${progress}<small>%</small></span>
+            </section>
 
-            <div class="subject-actions">
-                <button class="btn btn-primary" id="btn-add-category">+ Catégorie</button>
-                <button class="btn btn-secondary" id="btn-add-exam">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    + Examen
-                </button>
-            </div>
-
-            <div class="categories-container">
-                ${subject.categories.map(cat => renderCategory(subjectId, cat)).join('')}
-                ${subject.categories.length === 0 ? `
-                    <div class="empty-state">
-                        <div class="empty-icon">📂</div>
-                        <p>Aucune catégorie.<br>Ajoute TP, CM, TD, Projet…</p>
+            ${examsHtml ? `
+                <section class="subject-exams" aria-labelledby="subject-exams-title">
+                    <div class="section-heading">
+                        <div><h2 id="subject-exams-title">Examens & révisions</h2><p>Préparez chaque échéance à votre rythme.</p></div>
+                        <span class="section-count">${exams.length} examen${exams.length > 1 ? 's' : ''}</span>
                     </div>
-                ` : ''}
-            </div>
+                    <div class="exams-section">${examsHtml}</div>
+                </section>
+            ` : ''}
+
+            <section class="subject-courses" aria-labelledby="courses-title">
+                <div class="section-heading">
+                    <div><h2 id="courses-title">Cours et supports</h2><p>Organisez vos contenus par catégorie : CM, TD, TP, projets…</p></div>
+                    ${subject.categories.length > 0 ? `<span class="section-count">${subject.categories.length} catégorie${subject.categories.length > 1 ? 's' : ''}</span>` : ''}
+                </div>
+                <div class="categories-container">
+                    ${subject.categories.map(cat => renderCategory(subjectId, cat)).join('')}
+                    ${subject.categories.length === 0 ? `
+                        <div class="empty-state empty-categories">
+                            <span class="empty-category-icon" aria-hidden="true">
+                                <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.75 6.75h6l2 2h8.5v8.5a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2z"/><path d="M3.75 8.75v-2a2 2 0 0 1 2-2h5l2 2"/></svg>
+                            </span>
+                            <h3>Commencez par une catégorie</h3>
+                            <p>Créez une catégorie pour classer vos CM, TD, TP ou projets.</p>
+                            <button class="btn btn-primary btn-create-first-category" type="button">Créer une catégorie</button>
+                        </div>
+                    ` : ''}
+                </div>
+            </section>
         </div>
     `;
 
@@ -94,7 +120,7 @@ function renderExamCard(exam) {
                 </div>
                 <div class="exam-card-right">
                     <span class="exam-card-countdown">${eInfo.label}</span>
-                    <button class="btn-icon delete-exam-btn" data-exam-id="${exam.id}" title="Supprimer l'examen">×</button>
+                    <button class="btn-icon delete-exam-btn" data-exam-id="${exam.id}" title="Supprimer l'examen" aria-label="Supprimer l’examen ${escapeHtml(exam.name)}">×</button>
                 </div>
             </div>
 
@@ -112,11 +138,11 @@ function renderExamCard(exam) {
 
             <div class="exam-checklist" data-exam-id="${exam.id}">
                 ${exam.checklist.map(item => `
-                    <label class="checklist-item">
-                        <input type="checkbox" class="checklist-cb" data-exam-id="${exam.id}" data-item-id="${item.id}" ${item.done ? 'checked' : ''}>
+                    <div class="checklist-item">
+                        <input type="checkbox" class="checklist-cb" data-exam-id="${exam.id}" data-item-id="${item.id}" aria-label="${escapeHtml(item.text)}" ${item.done ? 'checked' : ''}>
                         <span class="checklist-text ${item.done ? 'done' : ''}">${escapeHtml(item.text)}</span>
                         <button class="btn-icon-sm delete-checklist-btn" data-exam-id="${exam.id}" data-item-id="${item.id}" title="Retirer">×</button>
-                    </label>
+                    </div>
                 `).join('')}
             </div>
 
@@ -136,13 +162,13 @@ function renderCategory(subjectId, category) {
                 <h3>${escapeHtml(category.name)}</h3>
                 <div style="display:flex; align-items:center; gap:0.375rem;">
                     <span class="category-count">${doneCount}/${category.items.length}</span>
-                    <button class="btn-icon danger delete-category-btn" data-category="${escapeHtml(category.name)}" title="Supprimer">×</button>
+                    <button class="btn-icon danger delete-category-btn" data-category="${escapeHtml(category.name)}" title="Supprimer la catégorie" aria-label="Supprimer la catégorie ${escapeHtml(category.name)}">×</button>
                 </div>
             </div>
             <div class="category-items">
                 ${category.items.length === 0 ? `
                     <div style="padding: 1.25rem; text-align: center; color: var(--text-secondary); font-size: 0.8125rem;">
-                        Aucun élément
+                        Aucun cours dans cette catégorie pour le moment.
                     </div>
                 ` : ''}
                 ${category.items.map(item => renderItem(category.name, item)).join('')}
@@ -162,16 +188,17 @@ function renderItem(categoryName, item) {
             <input type="checkbox" class="item-checkbox"
                 data-category="${escapeHtml(categoryName)}"
                 data-item-id="${item.id}"
+                aria-label="${escapeHtml(item.title)}"
                 ${item.done ? 'checked' : ''}>
             <span class="item-title ${item.done ? 'done' : ''}">${escapeHtml(item.title)}</span>
             <div class="item-actions">
                 ${item.fileId ? `
-                    <button class="file-badge open-file-btn" data-file-id="${item.fileId}" title="Ouvrir le fichier">
+                    <button class="file-badge open-file-btn" data-file-id="${item.fileId}" title="Ouvrir le fichier" aria-label="Ouvrir le fichier joint à ${escapeHtml(item.title)}">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         Fichier
                     </button>
                 ` : ''}
-                <label class="btn-icon" title="Importer un fichier" style="cursor:pointer;">
+                <label class="btn-icon attach-file-label" title="Joindre un fichier" aria-label="Joindre un fichier à ${escapeHtml(item.title)}" style="cursor:pointer;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <input type="file" class="import-file-input"
                         data-category="${escapeHtml(categoryName)}"
@@ -181,7 +208,7 @@ function renderItem(categoryName, item) {
                 <button class="btn-icon danger delete-item-btn"
                     data-category="${escapeHtml(categoryName)}"
                     data-item-id="${item.id}"
-                    title="Supprimer">×</button>
+                    title="Supprimer le cours" aria-label="Supprimer ${escapeHtml(item.title)}">×</button>
             </div>
         </div>
     `;
@@ -192,6 +219,10 @@ function bindEvents(subjectId) {
 
     document.getElementById('btn-add-category').addEventListener('click', () => {
         showAddCategoryModal(subjectId);
+    });
+
+    app.querySelectorAll('.btn-create-first-category').forEach(button => {
+        button.addEventListener('click', () => showAddCategoryModal(subjectId));
     });
 
     document.getElementById('btn-add-exam').addEventListener('click', () => {
