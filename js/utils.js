@@ -69,10 +69,10 @@ export function examInfo(dateStr) {
     const diff = Math.ceil((exam - now) / (1000 * 60 * 60 * 24));
 
     if (diff < 0) return { days: diff, label: 'Passé', urgency: 'past', icon: '✓' };
-    if (diff === 0) return { days: 0, label: "Aujourd'hui !", urgency: 'critical', icon: '🔴' };
-    if (diff === 1) return { days: 1, label: 'Demain !', urgency: 'critical', icon: '🔴' };
-    if (diff <= 3) return { days: diff, label: `Dans ${diff} jours`, urgency: 'critical', icon: '🔴' };
-    if (diff <= 7) return { days: diff, label: `Dans ${diff} jours`, urgency: 'warning', icon: '🟠' };
-    if (diff <= 14) return { days: diff, label: `Dans ${diff} jours`, urgency: 'soon', icon: '🟡' };
-    return { days: diff, label: `Dans ${diff} jours`, urgency: 'calm', icon: '🔵' };
+    if (diff === 0) return { days: 0, label: "Aujourd'hui", urgency: 'critical', icon: '' };
+    if (diff === 1) return { days: 1, label: 'Demain', urgency: 'critical', icon: '' };
+    if (diff <= 3) return { days: diff, label: `Dans ${diff} jours`, urgency: 'critical', icon: '' };
+    if (diff <= 7) return { days: diff, label: `Dans ${diff} jours`, urgency: 'warning', icon: '' };
+    if (diff <= 14) return { days: diff, label: `Dans ${diff} jours`, urgency: 'soon', icon: '' };
+    return { days: diff, label: `Dans ${diff} jours`, urgency: 'calm', icon: '' };
 }

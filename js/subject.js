@@ -1,5 +1,5 @@
 import { Store } from './store.js';
-import { calcProgress, progressClass, uuid, toast, escapeHtml, examInfo } from './utils.js?v=3';
+import { calcProgress, progressClass, uuid, toast, escapeHtml, examInfo } from './utils.js?v=6';
 
 export function renderSubject(subjectId) {
     const app = document.getElementById('app');
@@ -8,9 +8,9 @@ export function renderSubject(subjectId) {
     if (!subject) {
         app.innerHTML = `
             <div class="empty-state">
-                <div class="empty-icon">🔍</div>
-                <p>Matière introuvable</p>
-                <a class="back-link" href="#/">← Retour au dashboard</a>
+                <div class="empty-icon">·</div>
+                <p>Cette matière n'existe plus.</p>
+                <a class="back-link" href="#/">← Retour au cahier</a>
             </div>
         `;
         return;
@@ -37,9 +37,7 @@ export function renderSubject(subjectId) {
 
             <section class="subject-page-heading" aria-labelledby="subject-title">
                 <div class="subject-heading-copy">
-                    <span class="eyebrow">VOTRE MATIÈRE</span>
                     <h1 class="subject-title" id="subject-title">${escapeHtml(subject.name)}</h1>
-                    <p>Retrouvez ici vos cours, vos documents et vos révisions.</p>
                 </div>
                 <div class="subject-actions">
                     <button class="btn btn-secondary" id="btn-add-exam">
@@ -55,8 +53,8 @@ export function renderSubject(subjectId) {
 
             <section class="subject-progress-summary" aria-label="Progression de la matière">
                 <div class="subject-progress-copy">
-                    <span>Votre progression</span>
-                    <strong>${doneItems} cours terminé${doneItems > 1 ? 's' : ''} <small>sur ${totalItems}</small></strong>
+                    <span>Coché</span>
+                    <strong>${doneItems} <small>sur ${totalItems}</small></strong>
                 </div>
                 <div class="subject-progress-track progress-bar" role="progressbar" aria-label="Progression" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
                     <div class="progress-fill ${pClass}" style="width: ${progress}%"></div>
@@ -67,7 +65,7 @@ export function renderSubject(subjectId) {
             ${examsHtml ? `
                 <section class="subject-exams" aria-labelledby="subject-exams-title">
                     <div class="section-heading">
-                        <div><h2 id="subject-exams-title">Examens & révisions</h2><p>Préparez chaque échéance à votre rythme.</p></div>
+                        <div><h2 id="subject-exams-title">Examens</h2></div>
                         <span class="section-count">${exams.length} examen${exams.length > 1 ? 's' : ''}</span>
                     </div>
                     <div class="exams-section">${examsHtml}</div>
@@ -76,7 +74,7 @@ export function renderSubject(subjectId) {
 
             <section class="subject-courses" aria-labelledby="courses-title">
                 <div class="section-heading">
-                    <div><h2 id="courses-title">Cours et supports</h2><p>Organisez vos contenus par catégorie : CM, TD, TP, projets…</p></div>
+                    <div><h2 id="courses-title">Cours</h2><p>Regroupés par CM, TD, TP…</p></div>
                     ${subject.categories.length > 0 ? `<span class="section-count">${subject.categories.length} catégorie${subject.categories.length > 1 ? 's' : ''}</span>` : ''}
                 </div>
                 <div class="categories-container">
@@ -86,8 +84,8 @@ export function renderSubject(subjectId) {
                             <span class="empty-category-icon" aria-hidden="true">
                                 <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.75 6.75h6l2 2h8.5v8.5a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2z"/><path d="M3.75 8.75v-2a2 2 0 0 1 2-2h5l2 2"/></svg>
                             </span>
-                            <h3>Commencez par une catégorie</h3>
-                            <p>Créez une catégorie pour classer vos CM, TD, TP ou projets.</p>
+                            <h3>Rien ici pour l'instant.</h3>
+                            <p>Une catégorie, c'est un dossier : CM, TD, TP… tu choisis.</p>
                             <button class="btn btn-primary btn-create-first-category" type="button">Créer une catégorie</button>
                         </div>
                     ` : ''}
@@ -120,14 +118,14 @@ function renderExamCard(exam) {
                 </div>
                 <div class="exam-card-right">
                     <span class="exam-card-countdown">${eInfo.label}</span>
-                    <button class="btn-icon delete-exam-btn" data-exam-id="${exam.id}" title="Supprimer l'examen" aria-label="Supprimer l’examen ${escapeHtml(exam.name)}">×</button>
+                    <button class="btn-icon delete-exam-btn" data-exam-id="${exam.id}" title="Retirer l'examen" aria-label="Retirer l'examen ${escapeHtml(exam.name)}">×</button>
                 </div>
             </div>
 
             ${checkTotal > 0 ? `
             <div class="exam-ready-bar">
                 <div class="exam-ready-info">
-                    <span>Préparation</span>
+                    <span>Prêt</span>
                     <span class="exam-ready-pct">${readyPct}%</span>
                 </div>
                 <div class="progress-bar progress-bar-sm">
@@ -147,7 +145,7 @@ function renderExamCard(exam) {
             </div>
 
             <div class="exam-add-checklist">
-                <input type="text" class="checklist-input" data-exam-id="${exam.id}" placeholder="Ajouter une notion à réviser…">
+                <input type="text" class="checklist-input" data-exam-id="${exam.id}" placeholder="Une notion à revoir…">
                 <button class="btn-icon-sm add-checklist-btn" data-exam-id="${exam.id}" title="Ajouter">+</button>
             </div>
         </div>
@@ -167,15 +165,13 @@ function renderCategory(subjectId, category) {
             </div>
             <div class="category-items">
                 ${category.items.length === 0 ? `
-                    <div style="padding: 1.25rem; text-align: center; color: var(--text-secondary); font-size: 0.8125rem;">
-                        Aucun cours dans cette catégorie pour le moment.
-                    </div>
+                    <div class="category-empty">Vide.</div>
                 ` : ''}
                 ${category.items.map(item => renderItem(category.name, item)).join('')}
             </div>
             <div class="add-item-row">
                 <button class="btn btn-secondary btn-add-item" data-category="${escapeHtml(category.name)}">
-                    + Ajouter
+                    + Ajouter un cours
                 </button>
             </div>
         </div>
@@ -266,15 +262,15 @@ function bindEvents(subjectId) {
     // Delete exam
     app.querySelectorAll('.delete-exam-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            if (confirm('Supprimer cet examen ?')) {
+            if (confirm('Retirer cet examen ?')) {
                 Store.deleteExam(subjectId, btn.dataset.examId);
-                toast('Examen supprimé');
+                toast('Examen retiré');
                 renderSubject(subjectId);
             }
         });
     });
 
-    // Category / Item events (unchanged)
+    // Category / Item events
     app.querySelectorAll('.item-checkbox').forEach(cb => {
         cb.addEventListener('change', () => {
             Store.toggleItem(subjectId, cb.dataset.category, cb.dataset.itemId);
@@ -284,7 +280,7 @@ function bindEvents(subjectId) {
 
     app.querySelectorAll('.delete-category-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            if (confirm(`Supprimer la catégorie "${btn.dataset.category}" ?`)) {
+            if (confirm(`Supprimer la catégorie « ${btn.dataset.category} » ? Ses cours partent avec.`)) {
                 Store.deleteCategory(subjectId, btn.dataset.category);
                 renderSubject(subjectId);
             }
@@ -299,7 +295,7 @@ function bindEvents(subjectId) {
 
     app.querySelectorAll('.delete-item-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            if (confirm('Supprimer cet élément ?')) {
+            if (confirm('Supprimer ce cours ?')) {
                 Store.deleteItem(subjectId, btn.dataset.category, btn.dataset.itemId);
                 renderSubject(subjectId);
             }
@@ -313,7 +309,7 @@ function bindEvents(subjectId) {
                 const fileId = uuid();
                 await Store.saveFile(fileId, file);
                 Store.setItemFile(subjectId, input.dataset.category, input.dataset.itemId, fileId);
-                toast(`Fichier "${file.name}" importé`);
+                toast(`${file.name} ajouté`);
                 renderSubject(subjectId);
             }
         });
@@ -353,8 +349,8 @@ function showAddCategoryModal(subjectId) {
     const overlay = document.getElementById('modal-overlay');
     document.getElementById('modal-title').textContent = 'Nouvelle catégorie';
     document.getElementById('modal-body').innerHTML = `
-        <label for="category-name">Nom de la catégorie</label>
-        <input type="text" id="category-name" placeholder="ex : TP, CM, TD, Projet…" autofocus>
+        <label for="category-name">Nom</label>
+        <input type="text" id="category-name" placeholder="TP, CM, TD, projet…" autofocus>
     `;
 
     overlay.classList.remove('hidden');
@@ -373,7 +369,7 @@ function showAddCategoryModal(subjectId) {
         if (name) {
             const result = Store.addCategory(subjectId, name);
             if (result === null) {
-                toast('Cette catégorie existe déjà');
+                toast('Tu as déjà cette catégorie.');
                 return;
             }
             cleanup();
@@ -392,10 +388,10 @@ function showAddCategoryModal(subjectId) {
 
 function showAddItemModal(subjectId, categoryName) {
     const overlay = document.getElementById('modal-overlay');
-    document.getElementById('modal-title').textContent = `Ajouter à ${categoryName}`;
+    document.getElementById('modal-title').textContent = `Nouveau cours dans ${categoryName}`;
     document.getElementById('modal-body').innerHTML = `
-        <label for="item-title">Titre</label>
-        <input type="text" id="item-title" placeholder="ex : TP1 - Intégrales" autofocus>
+        <label for="item-title">Titre du cours</label>
+        <input type="text" id="item-title" placeholder="TP1 — Intégrales" autofocus>
     `;
 
     overlay.classList.remove('hidden');
@@ -431,13 +427,10 @@ function showAddExamModal(subjectId) {
     const overlay = document.getElementById('modal-overlay');
     document.getElementById('modal-title').textContent = 'Nouvel examen';
     document.getElementById('modal-body').innerHTML = `
-        <label for="exam-name">Nom de l'examen</label>
-        <input type="text" id="exam-name" placeholder="ex : Partiel, CC1, Rattrapage…" autofocus>
+        <label for="exam-name">Nom</label>
+        <input type="text" id="exam-name" placeholder="Partiel, CC1, Rattrapage…" autofocus>
         <label for="exam-date" style="margin-top: 0.75rem; display: block;">Date</label>
-        <input type="date" id="exam-date"
-               style="width:100%; padding:0.625rem 0.875rem; border:1px solid var(--border);
-                      border-radius:var(--radius-sm); font-family:inherit; font-size:0.875rem;
-                      outline:none; color:var(--text); cursor:pointer;">
+        <input type="date" id="exam-date">
     `;
 
     overlay.classList.remove('hidden');
@@ -456,13 +449,13 @@ function showAddExamModal(subjectId) {
         const date = document.getElementById('exam-date').value;
         if (name && date) {
             Store.addExam(subjectId, name, date);
-            toast('Examen ajouté');
+            toast('Examen noté');
             cleanup();
             renderSubject(subjectId);
         } else if (!name) {
             toast('Donne un nom à l\'examen');
         } else {
-            toast('Choisis une date');
+            toast('Il faut aussi une date');
         }
     };
 

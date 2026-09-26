@@ -1,7 +1,7 @@
 import { Store } from './store.js';
-import { renderDashboard } from './dashboard.js?v=5';
-import { renderSubject } from './subject.js?v=4';
-import { toast } from './utils.js?v=3';
+import { renderDashboard } from './dashboard.js?v=6';
+import { renderSubject } from './subject.js?v=6';
+import { toast } from './utils.js?v=6';
 
 // ===== UI Helpers =====
 
@@ -10,9 +10,9 @@ function showLoading(msg) {
     if (!div) {
         div = document.createElement('div');
         div.id = 'loading-overlay';
-        div.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.8);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
-        div.innerHTML = `<div class="spinner" style="width:40px;height:40px;border:4px solid var(--blue-light);border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite;"></div>
-        <p id="loading-msg" style="margin-top:1rem;font-weight:600;color:var(--blue-dark);font-family:var(--font);"></p>
+        div.style.cssText = 'position:fixed;inset:0;background:rgba(247,242,231,0.82);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+        div.innerHTML = `<div class="spinner" style="width:38px;height:38px;border:3px solid var(--accent-soft);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;"></div>
+        <p id="loading-msg" style="margin-top:1rem;font-weight:500;color:var(--ink);font-family:var(--font-body);font-size:14px;"></p>
         <style>@keyframes spin { to { transform: rotate(360deg); } }</style>`;
         document.body.appendChild(div);
     }
@@ -30,7 +30,7 @@ function hideLoading() {
 function route() {
     const hash = window.location.hash;
     const app = document.getElementById('app');
-    
+
     if (!hash || hash === '#/') {
         renderDashboard();
     } else if (hash.startsWith('#/subject/')) {
@@ -52,10 +52,10 @@ function sanitizeName(name) {
 
 async function exportZip() {
     try {
-        showLoading('Préparation de l\'archive...');
+        showLoading('On rassemble tes fichiers…');
         // allow UI to update
         await new Promise(r => setTimeout(r, 50));
-        
+
         const zip = new window.JSZip();
         const subjects = Store.getSubjects();
         const allFiles = await Store.getAllFiles();
@@ -70,9 +70,9 @@ async function exportZip() {
                     if (item.fileId && allFiles[item.fileId]) {
                         const fileData = allFiles[item.fileId];
                         const fileName = fileData.name || `${item.id}.bin`;
-                        // FIX: Add item ID to path to avoid collisions
+                        // Item ID prepended to path to avoid collisions
                         const filePath = `${subjectFolder}/${catFolder}/${item.id}_${fileName}`;
-                        
+
                         zip.file(filePath, fileData.blob);
                         fileMap[item.fileId] = { path: filePath, name: fileName, type: fileData.type || '' };
                     }
@@ -95,27 +95,27 @@ async function exportZip() {
 
         zip.file('data.json', JSON.stringify(exportData, null, 2));
 
-        showLoading('Compression...');
+        showLoading('On compresse…');
         await new Promise(r => setTimeout(r, 50));
-        
+
         const blob = await zip.generateAsync({ type: 'blob' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `courstrack_${new Date().toISOString().slice(0, 10)}.zip`;
+        a.download = `cahier_${new Date().toISOString().slice(0, 10)}.zip`;
         document.body.appendChild(a);
         a.click();
-        
+
         // Delay revoke to avoid interrupting download
         setTimeout(() => {
             URL.revokeObjectURL(url);
             if (document.body.contains(a)) document.body.removeChild(a);
         }, 2000);
-        
-        toast('Données exportées avec succès', 'success');
+
+        toast('Archive téléchargée.', 'success');
     } catch (err) {
         console.error('Export ZIP error:', err);
-        toast('Erreur lors de l\'exportation', 'error');
+        toast('L\'export a échoué.', 'error');
     } finally {
         hideLoading();
     }
@@ -125,9 +125,9 @@ async function exportZip() {
 
 async function importZip(file) {
     try {
-        showLoading('Analyse de l\'archive...');
+        showLoading('On ouvre l\'archive…');
         await new Promise(r => setTimeout(r, 50));
-        
+
         const zip = await window.JSZip.loadAsync(file);
 
         const dataFile = zip.file('data.json');
@@ -141,9 +141,9 @@ async function importZip(file) {
             throw new Error('structure JSON incorrecte');
         }
 
-        showLoading('Extraction des fichiers...');
+        showLoading('On sort les fichiers…');
         await new Promise(r => setTimeout(r, 50));
-        
+
         // Extract all files from ZIP first into memory to ensure safety before clearing DB
         const extractedFiles = [];
         for (const subject of data.subjects) {
@@ -170,18 +170,18 @@ async function importZip(file) {
             }
         }
 
-        showLoading('Sauvegarde...');
+        showLoading('On enregistre…');
         await Store.clearAllFiles();
         for (const f of extractedFiles) {
             await Store.saveFile(f.id, f.fileObj);
         }
 
         Store.importData(JSON.stringify(data));
-        toast('Données importées avec succès', 'success');
+        toast('Import terminé.', 'success');
         route();
     } catch (err) {
         console.error('Import ZIP error:', err);
-        toast('Fichier invalide ou corrompu', 'error');
+        toast('Ce fichier ne peut pas être lu.', 'error');
     } finally {
         hideLoading();
     }
@@ -194,10 +194,10 @@ function importJSON(file) {
     reader.onload = () => {
         const success = Store.importData(reader.result);
         if (success) {
-            toast('Données importées (sans fichiers)', 'info');
+            toast('Import terminé — sans les fichiers joints.', 'info');
             route();
         } else {
-            toast('Fichier JSON invalide', 'error');
+            toast('Ce fichier ne peut pas être lu.', 'error');
         }
     };
     reader.readAsText(file);
@@ -215,7 +215,7 @@ function init() {
     document.getElementById('btn-import').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
+
         // Case insensitive check
         if (file.name.toLowerCase().endsWith('.zip')) {
             importZip(file);

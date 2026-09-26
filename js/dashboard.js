@@ -1,16 +1,14 @@
 import { Store } from './store.js';
-import { calcProgress, progressClass, escapeHtml, examInfo } from './utils.js?v=3';
+import { calcProgress, progressClass, escapeHtml, examInfo } from './utils.js?v=6';
 
-// Accents doux pour identifier les matières sans surcharger les cartes.
+// Palette de tons terre pour distinguer les matières sans sortir de la palette générale.
 const SUBJECT_COLORS = [
-    { color: '#4868E8', tint: '#EEF1FF' },
-    { color: '#8256C7', tint: '#F4EEFB' },
-    { color: '#CC5D88', tint: '#FBEFF4' },
-    { color: '#C78126', tint: '#FBF4E9' },
-    { color: '#278B73', tint: '#EAF5F1' },
-    { color: '#218AA4', tint: '#EAF5F8' },
-    { color: '#CB6A40', tint: '#FBF0EB' },
-    { color: '#5968B8', tint: '#EEF0FA' },
+    { color: '#c0492a', tint: '#f3e0d3' }, // terracotta
+    { color: '#96712c', tint: '#f1ead0' }, // ocre
+    { color: '#7a6f9e', tint: '#eae6f0' }, // prune muette
+    { color: '#6b7a3d', tint: '#e8ecd0' }, // sauge / olive
+    { color: '#b45d6b', tint: '#f3e1e4' }, // rose poudré
+    { color: '#3f6f7a', tint: '#dde9ec' }, // bleu-vert profond
 ];
 
 export function renderDashboard() {
@@ -34,7 +32,7 @@ export function renderDashboard() {
         return hasItems && calcProgress(s) < 50;
     });
 
-    // Examens à venir (tous les examens de toutes les matières, triés, exclut les passés)
+    // Examens à venir (triés par proximité, passés exclus)
     const upcomingExams = [];
     for (const s of subjects) {
         if (!s.exams) continue;
@@ -49,13 +47,17 @@ export function renderDashboard() {
     }
     upcomingExams.sort((a, b) => a.info.days - b.info.days);
 
+    // Ligne de résumé dynamique — remplace la description vague par un chiffre concret
+    const summaryLine = subjects.length === 0
+        ? ''
+        : `${subjects.length} matière${subjects.length > 1 ? 's' : ''} · ${globalDone} sur ${globalTotal} cours coché${globalDone > 1 ? 's' : ''}`;
+
     app.innerHTML = `
         <div class="dashboard">
             <section class="page-heading" aria-labelledby="dashboard-title">
                 <div>
-                    <span class="eyebrow">VOTRE ESPACE DE TRAVAIL</span>
-                    <h1 id="dashboard-title">Vos cours, en un coup d’œil</h1>
-                    <p>Suivez votre progression et gardez vos révisions au clair.</p>
+                    <h1 id="dashboard-title">Tes cours</h1>
+                    ${summaryLine ? `<p>${summaryLine}</p>` : ''}
                 </div>
                 ${subjects.length > 0 ? `
                     <button class="btn btn-primary" id="add-subject-top">
@@ -68,16 +70,14 @@ export function renderDashboard() {
             ${subjects.length > 0 ? `
                 <section class="global-summary" aria-labelledby="progress-title">
                     <div class="summary-copy">
-                        <span class="eyebrow">VOTRE AVANCÉE</span>
-                        <h2 id="progress-title">Chaque cours compte.</h2>
-                        <p>${globalDone} cours terminé${globalDone > 1 ? 's' : ''} sur ${globalTotal} · ${subjects.length} matière${subjects.length > 1 ? 's' : ''}</p>
+                        <h2 id="progress-title">Où tu en es</h2>
                     </div>
                     <div class="summary-progress">
                         <div class="summary-progress-heading">
-                            <span>Progression globale</span>
+                            <span>Semestre entier</span>
                             <strong>${globalProgress}<small>%</small></strong>
                         </div>
-                        <div class="progress-bar progress-bar-lg" role="progressbar" aria-label="Progression globale" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${globalProgress}">
+                        <div class="progress-bar progress-bar-lg" role="progressbar" aria-label="Progression sur le semestre entier" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${globalProgress}">
                             <div class="progress-fill ${globalPClass}" style="width: ${globalProgress}%"></div>
                         </div>
                     </div>
@@ -89,7 +89,7 @@ export function renderDashboard() {
                             <div class="panel-heading-icon" aria-hidden="true">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
                             </div>
-                            <div><h2 id="upcoming-title">Prochains examens</h2><p>Les dates à garder en tête</p></div>
+                            <div><h2 id="upcoming-title">Prochains examens</h2></div>
                         </div>
                         <div class="exams-list">
                             ${upcomingExams.map(e => {
@@ -100,7 +100,7 @@ export function renderDashboard() {
                                     <span class="exam-icon" aria-hidden="true">${e.info.icon}</span>
                                     <span class="exam-row-info">
                                         <span class="exam-name">${escapeHtml(e.subject.name)} <span class="exam-separator">·</span> ${escapeHtml(e.exam.name)}</span>
-                                        ${readyPct !== null ? `<span class="exam-ready">Préparation : ${readyPct}%</span>` : ''}
+                                        ${readyPct !== null ? `<span class="exam-ready">Prêt à ${readyPct}%</span>` : ''}
                                     </span>
                                     <span class="exam-date">${dateFormatted}</span>
                                     <span class="exam-countdown">${e.info.label}</span>
@@ -115,13 +115,13 @@ export function renderDashboard() {
                 ${behindSubjects.length > 0 ? `
                     <aside class="behind-alert">
                         <span class="behind-icon" aria-hidden="true">✦</span>
-                        <span><strong>À travailler en priorité</strong><span class="focus-list">${behindSubjects.map(s => escapeHtml(s.name)).join(' · ')}</span></span>
+                        <span><strong>Un peu en retard :</strong><span class="focus-list">${behindSubjects.map(s => escapeHtml(s.name)).join(' · ')}</span></span>
                     </aside>
                 ` : ''}
 
                 <section class="subjects-section" aria-labelledby="subjects-title">
                     <div class="dashboard-header">
-                        <div><h2 id="subjects-title">Mes matières</h2><p>Ouvrez une matière pour retrouver vos cours et supports.</p></div>
+                        <div><h2 id="subjects-title">Mes matières</h2></div>
                         <span class="subject-total">${subjects.length} matière${subjects.length > 1 ? 's' : ''}</span>
                     </div>
                     <div class="subjects-grid">
@@ -141,12 +141,11 @@ export function renderDashboard() {
                             <i><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></i>
                         </div>
                     </div>
-                    <span class="eyebrow">TOUT COMMENCE ICI</span>
-                    <h2 id="welcome-title">Votre semestre, mieux organisé.</h2>
-                    <p>Ajoutez une matière pour réunir vos cours, vos supports et vos dates d’examen au même endroit.</p>
+                    <h2 id="welcome-title">Ton cahier est vide.</h2>
+                    <p>Ajoute une matière. Ensuite tu pourras y déposer tes CM, TD, TP, et noter tes dates d'examens.</p>
                     <button class="btn btn-primary btn-welcome" id="add-subject-card" type="button">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-                        Ajouter ma première matière
+                        Créer ma première matière
                     </button>
                 </section>
             `}
@@ -157,7 +156,7 @@ export function renderDashboard() {
     app.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (confirm(`Supprimer "${btn.dataset.name}" et tout son contenu ?`)) {
+            if (confirm(`Supprimer « ${btn.dataset.name} » ? Ses cours et fichiers partent avec.`)) {
                 Store.deleteSubject(btn.dataset.id);
                 renderDashboard();
                 window.scrollTo(0, 0);
@@ -182,7 +181,7 @@ function renderCard(subject, index) {
     }
     const remaining = totalItems - doneItems;
 
-    // Nearest upcoming exam badge
+    // Prochain examen à venir
     const exams = (subject.exams || [])
         .map(e => ({ exam: e, info: examInfo(e.date) }))
         .filter(e => e.info && e.info.days >= 0)
@@ -191,7 +190,8 @@ function renderCard(subject, index) {
     let examBadgeHtml = '';
     if (exams.length > 0) {
         const nearest = exams[0];
-        examBadgeHtml = `<span class="exam-badge exam-badge-${nearest.info.urgency}">${nearest.info.icon} ${nearest.info.label}</span>`;
+        const iconPart = nearest.info.icon ? `${nearest.info.icon} ` : '';
+        examBadgeHtml = `<span class="exam-badge exam-badge-${nearest.info.urgency}">${iconPart}${nearest.info.label}</span>`;
         if (exams.length > 1) {
             examBadgeHtml += `<span class="exam-badge exam-badge-calm">+${exams.length - 1} examen${exams.length > 2 ? 's' : ''}</span>`;
         }
@@ -206,9 +206,9 @@ function renderCard(subject, index) {
                 </div>
                 ${examBadgeHtml ? `<div class="card-exams">${examBadgeHtml}</div>` : ''}
                 <div class="card-stats">
-                    ${doneItems > 0 ? `<span class="stat-badge done">✓ ${doneItems} terminé${doneItems > 1 ? 's' : ''}</span>` : ''}
+                    ${doneItems > 0 ? `<span class="stat-badge done">✓ ${doneItems} coché${doneItems > 1 ? 's' : ''}</span>` : ''}
                     ${remaining > 0 ? `<span class="stat-badge remaining">${remaining} à faire</span>` : ''}
-                    ${totalItems === 0 ? `<span class="stat-badge remaining">Aucun cours ajouté</span>` : ''}
+                    ${totalItems === 0 ? `<span class="stat-badge remaining">Rien encore</span>` : ''}
                 </div>
                 <div class="card-footer">
                     <div class="card-progress-row">
@@ -228,8 +228,8 @@ function showAddSubjectModal() {
     const overlay = document.getElementById('modal-overlay');
     document.getElementById('modal-title').textContent = 'Nouvelle matière';
     document.getElementById('modal-body').innerHTML = `
-        <label for="subject-name">Nom de la matière</label>
-        <input type="text" id="subject-name" placeholder="ex : Mathématiques" autofocus>
+        <label for="subject-name">Comment tu l'appelles ?</label>
+        <input type="text" id="subject-name" placeholder="Maths, Algo, Anglais…" autofocus>
     `;
 
     overlay.classList.remove('hidden');
